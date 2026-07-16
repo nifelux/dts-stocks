@@ -12,8 +12,8 @@
 <div class="section" style="max-width:500px; margin:auto; padding-top: 80px;">
   <h2>Identity Verification</h2>
   <p class="alert alert-info" id="kyc-status-banner">
-    To prevent duplicate accounts and protect your funds, please upload a valid government ID (front &amp; back)
-    and a clear selfie. All documents are required before withdrawals.
+    To prevent duplicate accounts, please upload your face image and provide your full legal name.
+    Both are required before withdrawals.
   </p>
 
   <form id="kyc-form">
@@ -23,17 +23,7 @@
     </div>
 
     <div class="form-group">
-      <label>Government ID – Front</label>
-      <input type="file" id="id-front" class="form-input" accept="image/*" required>
-    </div>
-
-    <div class="form-group">
-      <label>Government ID – Back</label>
-      <input type="file" id="id-back" class="form-input" accept="image/*" required>
-    </div>
-
-    <div class="form-group">
-      <label>Clear Face Image (Selfie)</label>
+      <label>Upload Clear Face Image (Selfie)</label>
       <input type="file" id="face-image" class="form-input" accept="image/*" required>
     </div>
 
@@ -59,9 +49,7 @@ window.supabase = supabase;
 // Bucket is PRIVATE — every path is scoped to the user's own folder so the
 // storage RLS policy (see kyc_storage_policies.sql) can enforce ownership.
 const DOC_TYPES = [
-  { inputId: 'id-front',   docType: 'id_front', label: 'ID (front)' },
-  { inputId: 'id-back',    docType: 'id_back',  label: 'ID (back)' },
-  { inputId: 'face-image', docType: 'selfie',   label: 'Selfie' }
+  { inputId: 'face-image', docType: 'selfie', label: 'Selfie' }
 ];
 
 function extOf(file) {
