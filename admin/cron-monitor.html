@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cron Monitor – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Cron Job Status</h2>
+      <button class="btn btn-primary mb-2" onclick="triggerDaily()">Run Daily Income Now</button>
+      <div id="logs"></div>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    async function load() {
+      const token = await getToken();
+      const res = await fetch('/api/cron?action=status', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      document.getElementById('logs').innerHTML = data.map(l => `
+        <div class="card mb-1">${l.job_name} – <span class="badge ${l.status === 'success' ? 'badge-success' : l.status === 'failed' ? 'badge-danger' : 'badge-warning'}">${l.status}</span> ${new Date(l.created_at).toLocaleString()}</div>
+      `).join('');
+    }
+    window.triggerDaily = async () => {
+      const token = await getToken();
+      await fetch('/api/cron?action=triggerDailyIncome', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      alert('Daily income triggered');
+      load();
+    };
+    load();
+  </script>
+</body>
+</html>
