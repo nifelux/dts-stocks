@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gift Codes – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Gift Codes</h2>
+      <form id="gift-form" class="card mb-2">
+        <div class="form-group"><input id="code" class="form-input" placeholder="Code" required></div>
+        <div class="form-group"><input id="amount" type="number" class="form-input" placeholder="Amount (₦)" required></div>
+        <div class="form-group"><input id="max_uses" type="number" class="form-input" placeholder="Max Uses" value="1"></div>
+        <button class="btn btn-primary">Create Gift Code</button>
+      </form>
+      <table id="gift-table"><thead><tr><th>Code</th><th>Amount</th><th>Used</th><th>Active</th><th>Actions</th></tr></thead><tbody></tbody></table>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    async function load() {
+      const { data } = await supabase.from('gift_codes').select('*').order('created_at', { ascending: false });
+      document.querySelector('#gift-table tbody').innerHTML = data.map(g => `
+        <tr>
+          <td>${g.code}</td><td>₦${g.amount.toLocaleString()}</td>
+          <td>${g.current_uses}/${g.max_uses}</td><td>${g.is_active ? 'Yes' : 'No'}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="deleteCode('${g.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('gift-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = (await supabase.auth.getUser()).data.user;
+      await supabase.from('gift_codes').insert({
+        code: document.getElementById('code').value,
+        amount: +document.getElementById('amount').value,
+        max_uses: +document.getElementById('max_uses').value,
+        created_by: user.id
+      });
+      load();
+      e.target.reset();
+    });
+    window.deleteCode = async (id) => {
+      await supabase.from('gift_codes').delete().eq('id', id);
+      load();
+    };
+    load();
+  </script>
+</body>
+</html>
