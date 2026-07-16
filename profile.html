@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile – DTL Stocks</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo"><strong>DTL Stocks</strong></div>
+    <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="profile.html" class="active">Profile</a></li></ul>
+  </nav>
+
+  <div class="section" style="max-width:500px; margin:auto;">
+    <h2>Your Profile</h2>
+    <form id="profile-form">
+      <div class="form-group"><label>Full Name</label><input id="full_name" class="form-input"></div>
+      <div class="form-group"><label>Phone</label><input id="phone" class="form-input"></div>
+      <button class="btn btn-primary btn-block">Update</button>
+    </form>
+    <p class="mt-2">VIP Level: <span id="vip-level"></span></p>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+
+    async function loadProfile() {
+      const user = (await supabase.auth.getUser()).data.user;
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      document.getElementById('full_name').value = data.full_name || '';
+      document.getElementById('phone').value = data.phone || '';
+      document.getElementById('vip-level').textContent = data.vip_level;
+    }
+
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = (await supabase.auth.getUser()).data.user;
+      await supabase.from('profiles').update({
+        full_name: document.getElementById('full_name').value,
+        phone: document.getElementById('phone').value
+      }).eq('id', user.id);
+      alert('Profile updated');
+    });
+
+    loadProfile();
+  </script>
+</body>
+</html>
