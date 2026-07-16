@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div id="header-container"></div>>
   <nav class="navbar">
     <div class="logo"><strong>DTL Stocks</strong></div>
     <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="withdraw.html" class="active">Withdraw</a></li><li><a href="#" id="logout-btn">Logout</a></li></ul>
@@ -31,6 +32,11 @@
     const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
 
     document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
+  const { data: kycProfile } = await supabase.from("profiles").select("kyc_status").eq("id", user.id).single();
+  if (kycProfile?.kyc_status !== "approved") {
+    document.getElementById("withdraw-form").innerHTML = "<div class=\"alert alert-danger\">KYC verification required. Please <a href=\"/kyc.html\">upload your face and full name</a> for identity verification.</div>";
+    return;
+  }
       e.preventDefault();
       const user = (await supabase.auth.getUser()).data.user;
       const { data: settings } = await supabase.from('settings').select('*').eq('key','withdrawal').single();
@@ -60,5 +66,7 @@
     }
     loadHistory();
   </script>
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
 </body>
 </html>

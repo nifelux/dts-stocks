@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div id="header-container"></div>>
   <nav class="navbar">
     <div class="logo"><strong>DTL Stocks</strong></div>
     <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="income-history.html" class="active">Income</a></li></ul>
@@ -24,5 +25,7 @@
       document.querySelector('#earnings-table tbody').innerHTML = data?.map(t => `<tr><td>₦${t.amount.toLocaleString()}</td><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${t.reference || ''}</td></tr>`).join('');
     })();
   </script>
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
 </body>
 </html>

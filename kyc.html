@@ -3,51 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KYC – DTL Stocks</title>
+  <title>KYC Verification – DTL Stocks</title>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-  <nav class="navbar">
-    <div class="logo"><strong>DTL Stocks</strong></div>
-    <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="kyc.html" class="active">KYC</a></li></ul>
-  </nav>
-
-  <div class="section" style="max-width:500px; margin:auto;">
-    <h2>Verify Identity (KYC)</h2>
+  <div id="header-container"></div>
+  <div class="section" style="max-width:500px; margin:auto; padding-top: 80px;">
+    <h2>Identity Verification</h2>
+    <p class="alert alert-info">To prevent duplicate accounts, please upload your face image and provide your full legal name. Both are required before withdrawals.</p>
     <form id="kyc-form">
       <div class="form-group">
-        <label>Document Type</label>
-        <select id="doc_type" class="form-select">
-          <option value="id_front">ID Card (Front)</option>
-          <option value="id_back">ID Card (Back)</option>
-          <option value="selfie">Selfie</option>
-          <option value="address_proof">Proof of Address</option>
-        </select>
+        <label>Full Legal Name (as on ID)</label>
+        <input type="text" id="full_name" class="form-input" required>
       </div>
       <div class="form-group">
-        <label>Upload Image</label>
-        <input type="file" id="file" accept="image/*" required>
+        <label>Upload Clear Face Image (Selfie)</label>
+        <input type="file" id="face-image" accept="image/*" required>
       </div>
-      <button type="submit" class="btn btn-primary btn-block">Submit</button>
+      <button type="submit" class="btn btn-primary btn-block">Submit Verification</button>
     </form>
     <h3 class="mt-3">Submitted Documents</h3>
     <div id="docs-list"></div>
   </div>
-
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+    const supabase = createClient('YOUR_URL', 'YOUR_ANON_KEY');
+    window.supabase = supabase;
 
     document.getElementById('kyc-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const user = (await supabase.auth.getUser()).data.user;
-      const file = document.getElementById('file').files[0];
-      const docType = document.getElementById('doc_type').value;
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data: upload } = await supabase.storage.from('kyc').upload(fileName, file);
+      const fullName = document.getElementById('full_name').value;
+      const file = document.getElementById('face-image').files[0];
+      if (!file) return alert('Upload your face image.');
+
+      // Upload image to kyc bucket
+      const fileName = `selfie_${Date.now()}_${file.name}`;
+      const { data: upload, error: uploadErr } = await supabase.storage.from('kyc').upload(fileName, file);
+      if (uploadErr) return alert(uploadErr.message);
       const { data: { publicUrl } } = supabase.storage.from('kyc').getPublicUrl(upload.path);
-      await supabase.from('kyc_documents').insert({ user_id: user.id, doc_type: docType, image_url: publicUrl });
-      alert('Document uploaded!');
+
+      // Save KYC document (type 'selfie')
+      await supabase.from('kyc_documents').insert({
+        user_id: user.id,
+        doc_type: 'selfie',
+        image_url: publicUrl
+      });
+
+      // Update profile with full name and set KYC status to pending
+      await supabase.from('profiles').update({ full_name: fullName, kyc_status: 'pending' }).eq('id', user.id);
+      alert('Verification submitted. Admin will review.');
       location.reload();
     });
 

@@ -29,6 +29,10 @@ export default async function handler(req, res) {
 
 async function createDeposit(req, res) {
   const user = await verifyUser(req);
+  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
+    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
+  }
   const { amount, payment_method, proof_image_url } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
@@ -44,6 +48,10 @@ async function createDeposit(req, res) {
 
 async function listDeposits(req, res) {
   const user = await verifyUser(req);
+  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
+    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
+  }
   // User sees own; if admin, we'll handle in admin api. But here just own.
   const { data } = await supabaseAdmin.from('deposits').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
   return res.status(200).json(data);
@@ -83,6 +91,10 @@ async function rejectDeposit(req, res) {
 
 async function createWithdrawal(req, res) {
   const user = await verifyUser(req);
+  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
+    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
+  }
   const { amount, bank_name, account_number, account_name } = req.body;
   try { withdrawSchema.parse(req.body); } catch (e) { return res.status(400).json({ error: e.errors[0].message }); }
 
@@ -123,6 +135,10 @@ async function createWithdrawal(req, res) {
 
 async function listWithdrawals(req, res) {
   const user = await verifyUser(req);
+  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
+    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
+  }
   const { data } = await supabaseAdmin.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
   return res.status(200).json(data);
 }

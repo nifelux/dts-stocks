@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div id="header-container"></div>>
   <nav class="navbar">
     <div class="logo"><strong>DTL Stocks</strong></div>
     <ul class="nav-links">
@@ -21,6 +22,7 @@
   </nav>
 
   <div class="section">
+  <div class="card mb-2"><h4>KYC Status</h4><p id="kyc-status">Loading...</p><a href="/kyc.html" class="btn btn-sm btn-outline">Manage KYC</a></div>
     <div class="widget-grid mb-3">
       <div class="card stat-card">
         <div class="stat-value" id="balance">₦0</div>
@@ -65,6 +67,15 @@
     async function loadDashboard(user) {
       // Wallet
       const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', user.id).single();
+  const { data: profileKyc } = await supabase.from("profiles").select("kyc_status, full_name").eq("id", user.id).single();
+  const statusDiv = document.getElementById("kyc-status");
+  if (profileKyc?.kyc_status === "approved") {
+    statusDiv.innerHTML = "<span class=\"badge badge-success\">Verified</span>";
+  } else if (profileKyc?.kyc_status === "pending") {
+    statusDiv.innerHTML = "<span class=\"badge badge-warning\">Pending Review</span>";
+  } else {
+    statusDiv.innerHTML = "<span class=\"badge badge-danger\">Not Verified – Withdrawals locked</span>";
+  }
       document.getElementById('balance').textContent = '₦' + (wallet?.balance || 0).toLocaleString();
       document.getElementById('total-deposited').textContent = '₦' + (wallet?.total_deposited || 0).toLocaleString();
       document.getElementById('total-earned').textContent = '₦' + (wallet?.total_earned || 0).toLocaleString();
@@ -91,5 +102,7 @@
 
     checkAuth().then(user => loadDashboard(user));
   </script>
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
 </body>
   </html>

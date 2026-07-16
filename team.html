@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div id="header-container"></div>>
   <nav class="navbar"><div class="logo"><strong>DTL Stocks</strong></div><ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="team.html" class="active">Team</a></li></ul></nav>
   <div class="section"><h2>My Downline</h2><div id="team-list"></div></div>
   <script type="module">
@@ -18,5 +19,7 @@
       document.getElementById('team-list').innerHTML = data?.map(d => `<div class="card mb-1">${d.full_name||d.email} – Joined ${new Date(d.created_at).toLocaleDateString()}</div>`).join('') || 'No referrals yet.';
     })();
   </script>
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
 </body>
 </html>
