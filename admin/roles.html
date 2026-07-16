@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Roles – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Admin Roles</h2>
+      <div class="card mb-2">
+        <h4>Promote User to Admin</h4>
+        <div class="form-group">
+          <input type="text" id="user-id" class="form-input" placeholder="Enter User ID (UUID)">
+        </div>
+        <button class="btn btn-primary" onclick="promote()">Promote to Admin</button>
+      </div>
+      <h4>Current Admins</h4>
+      <div id="admins-list"></div>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    async function loadAdmins() {
+      const { data } = await supabase.from('profiles').select('id, email, full_name').eq('is_admin', true);
+      document.getElementById('admins-list').innerHTML = data.map(u => `
+        <div class="card mb-1"><strong>${u.full_name || u.email}</strong> (${u.id.slice(0,8)}...)</div>
+      `).join('') || 'No admins found';
+    }
+    window.promote = async () => {
+      const userId = document.getElementById('user-id').value.trim();
+      if (!userId) return alert('Enter a User ID');
+      const { error } = await supabase.from('profiles').update({ is_admin: true }).eq('id', userId);
+      if (error) return alert(error.message);
+      alert('User promoted to admin');
+      loadAdmins();
+    };
+    loadAdmins();
+  </script>
+</body>
+</html>
