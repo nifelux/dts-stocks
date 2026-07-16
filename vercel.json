@@ -4,5 +4,7 @@
       "memory": 512,
       "maxDuration": 10
     }
-  }
+  },
+  "outputDirectory": ".",
+  "buildCommand": ""
 }
