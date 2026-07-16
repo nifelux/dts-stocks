@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Users – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html" class="active">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Users</h2>
+      <div class="flex gap-2 mb-2">
+        <input type="text" id="search" class="form-input" placeholder="Search by name or email" style="flex:1">
+        <button class="btn btn-primary" id="search-btn">Search</button>
+      </div>
+      <table id="users-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>VIP</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="flex gap-2 mt-2" id="pagination"></div>
+      <!-- Action Modals -->
+      <div class="modal-overlay" id="action-modal">
+        <div class="modal-content">
+          <h3 id="modal-title"></h3>
+          <div id="modal-body"></div>
+          <button class="btn btn-primary mt-2" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    let page = 0;
+    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    async function checkAdmin() { /* same check as dashboard */ }
+    async function loadUsers(search='') {
+      const token = await getToken();
+      const res = await fetch(`/api/admin?action=users&page=${page}&limit=15&search=${encodeURIComponent(search)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const { data, count } = await res.json();
+      const tbody = document.querySelector('#users-table tbody');
+      tbody.innerHTML = data.map(u => `
+        <tr>
+          <td>${u.full_name||'N/A'}</td>
+          <td>${u.email}</td>
+          <td>₦${(u.wallets?.balance||0).toLocaleString()}</td>
+          <td>${u.vip_level}</td>
+          <td>${u.is_banned ? '<span class="badge badge-danger">Banned</span>' : u.is_frozen ? '<span class="badge badge-warning">Frozen</span>' : '<span class="badge badge-success">Active</span>'}</td>
+          <td class="flex gap-1">
+            <button class="btn btn-sm btn-outline" onclick="openAction('${u.id}', 'freeze', ${u.is_frozen})">${u.is_frozen?'Unfreeze':'Freeze'}</button>
+            <button class="btn btn-sm btn-danger" onclick="openAction('${u.id}', 'ban', ${u.is_banned})">${u.is_banned?'Unban':'Ban'}</button>
+            <button class="btn btn-sm btn-outline" onclick="openCreditDebit('${u.id}')">C/D</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('pagination').innerHTML = `
+        <button class="btn btn-sm" ${page===0?'disabled':''} onclick="prevPage()">Prev</button>
+        <span>Page ${page+1}</span>
+        <button class="btn btn-sm" ${(data.length < 15)?'disabled':''} onclick="nextPage()">Next</button>
+      `;
+    }
+    window.prevPage = ()=> { if(page>0){ page--; loadUsers(document.getElementById('search').value); } };
+    window.nextPage = ()=> { page++; loadUsers(document.getElementById('search').value); };
+    document.getElementById('search-btn').addEventListener('click', ()=> { page=0; loadUsers(document.getElementById('search').value); });
+    window.openAction = async (userId, type, currentState) => {
+      const token = await getToken();
+      const action = type === 'freeze' ? (currentState ? 'unfreezeUser' : 'freezeUser') : (currentState ? 'unbanUser' : 'banUser');
+      await fetch(`/api/admin?action=${action}`, { method: 'POST', headers: { 'Content-Type':'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ user_id: userId }) });
+      loadUsers(document.getElementById('search').value);
+    };
+    window.openCreditDebit = (userId) => {
+      document.getElementById('modal-title').textContent = 'Credit / Debit Wallet';
+      document.getElementById('modal-body').innerHTML = `
+        <div class="form-group"><label>Amount (₦)</label><input id="cd-amount" class="form-input" type="number"></div>
+        <div class="form-group"><label>Note</label><input id="cd-note" class="form-input"></div>
+        <button class="btn btn-success" onclick="doCredit('${userId}')">Credit</button>
+        <button class="btn btn-danger" onclick="doDebit('${userId}')">Debit</button>
+      `;
+      document.getElementById('action-modal').classList.add('active');
+    };
+    window.doCredit = async (userId) => {
+      const token = await getToken();
+      await fetch('/api/admin?action=creditWallet', { method:'POST', headers: { 'Content-Type':'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ user_id: userId, amount: +document.getElementById('cd-amount').value, note: document.getElementById('cd-note').value }) });
+      closeModal(); loadUsers(document.getElementById('search').value);
+    };
+    window.doDebit = async (userId) => {
+      const token = await getToken();
+      await fetch('/api/admin?action=debitWallet', { method:'POST', headers: { 'Content-Type':'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ user_id: userId, amount: +document.getElementById('cd-amount').value, note: document.getElementById('cd-note').value }) });
+      closeModal(); loadUsers(document.getElementById('search').value);
+    };
+    window.closeModal = () => document.getElementById('action-modal').classList.remove('active');
+    checkAdmin().then(()=> loadUsers());
+  </script>
+</body>
+  </html>
