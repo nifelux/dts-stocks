@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Withdrawals – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html" class="active">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Withdrawals</h2>
+      <div class="flex gap-2 mb-2">
+        <select id="status-filter" class="form-select"><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+        <button class="btn btn-primary" id="load-btn">Load</button>
+      </div>
+      <table id="withdrawals-table"><thead><tr><th>User</th><th>Amount</th><th>Bank</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    async function load() {
+      const status = document.getElementById('status-filter').value;
+      const token = await getToken();
+      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const tbody = document.querySelector('#withdrawals-table tbody');
+      tbody.innerHTML = data.map(w => `
+        <tr>
+          <td>${w.user_id?.slice(0,8)}</td>
+          <td>₦${w.amount.toLocaleString()}</td>
+          <td>${w.bank_details?.bank_name} ${w.bank_details?.account_number}</td>
+          <td>${w.status}</td>
+          <td>${w.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Approve</button> <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject</button>` : ''}</td>
+        </tr>
+      `).join('');
+    }
+    window.approve = async (id) => {
+      const token = await getToken();
+      await fetch('/api/finance?action=approveWithdrawal', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
+      load();
+    };
+    window.reject = async (id) => {
+      const token = await getToken();
+      await fetch('/api/finance?action=rejectWithdrawal', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
+      load();
+    };
+    document.getElementById('load-btn').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>
