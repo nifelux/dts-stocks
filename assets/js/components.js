@@ -1,9 +1,14 @@
+// ============================================================
+// Site-wide header/footer loader + auth-aware navigation builder
+// ============================================================
+
 async function loadComponents() {
   try {
     const headerRes = await fetch('/assets/html/header.html');
     const headerHTML = await headerRes.text();
     document.getElementById('header-container').innerHTML = headerHTML;
     updateAuthUI();
+    initMobileMenu();
   } catch (err) { console.error('Header load failed', err); }
 
   try {
@@ -13,42 +18,242 @@ async function loadComponents() {
   } catch (err) { console.error('Footer load failed', err); }
 }
 
+// ------------------------------------------------------------
+// Nav data — single source of truth for every user-facing page.
+// Edit here to add/remove pages from the menu site-wide.
+// ------------------------------------------------------------
+const NAV_GROUPS_AUTHED = [
+  { label: 'Dashboard', href: '/dashboard.html' },
+  {
+    label: 'Invest',
+    items: [
+      { label: 'My Investments', href: '/investments.html' },
+      { label: 'Investment Details', href: '/investment-details.html' },
+      { label: 'Daily Earnings', href: '/daily-earnings.html' },
+      { label: 'VIP Levels', href: '/vip.html' }
+    ]
+  },
+  {
+    label: 'Wallet',
+    items: [
+      { label: 'Deposit', href: '/deposit.html' },
+      { label: 'Withdraw', href: '/withdraw.html' },
+      { label: 'Transaction History', href: '/transaction-history.html' },
+      { label: 'Income History', href: '/income-history.html' },
+      { label: 'Gift Codes', href: '/gift-codes.html' }
+    ]
+  },
+  {
+    label: 'Account',
+    items: [
+      { label: 'Profile', href: '/profile.html' },
+      { label: 'KYC Verification', href: '/kyc.html' },
+      { label: 'Referral Program', href: '/referral.html' },
+      { label: 'Settings', href: '/settings.html' },
+      { label: 'Messages', href: '/messages.html' },
+      { label: 'Support', href: '/support.html' }
+    ]
+  }
+];
+
+const NAV_GUEST = [
+  { label: 'Home', href: '/' },
+  { label: 'About', href: '/about.html' },
+  { label: 'FAQ', href: '/faq.html' },
+  { label: 'Company News', href: '/company-news.html' },
+  { label: 'Contact', href: '/contact.html' }
+];
+
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name[0].toUpperCase();
+}
+
+function renderDesktopNav(groups, { user, displayName, adminLink } = {}) {
+  const groupHtml = groups.map(g => {
+    if (!g.items) {
+      return `<a href="${g.href}" class="nav-link">${g.label}</a>`;
+    }
+    return `
+      <div class="nav-dropdown">
+        <button type="button" class="nav-link dropdown-toggle">
+          ${g.label}
+          <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="dropdown-menu">
+          ${g.items.map(i => `<a href="${i.href}">${i.label}</a>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (!user) {
+    return `
+      ${groupHtml}
+      <a href="/login.html" class="nav-link">Login</a>
+      <a href="/register.html" class="btn btn-sm btn-primary">Get Started</a>
+    `;
+  }
+
+  return `
+    ${groupHtml}
+    ${adminLink}
+    <div class="nav-dropdown user-chip">
+      <button type="button" class="nav-link dropdown-toggle user-chip-btn">
+        <span class="avatar-circle">${initials(displayName)}</span>
+        <span class="user-chip-name">${displayName}</span>
+        <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="dropdown-menu dropdown-menu-right">
+        <a href="/profile.html">My Profile</a>
+        <a href="#" id="logout-link">Logout</a>
+      </div>
+    </div>
+  `;
+}
+
+function renderMobileNav(groups, { user, displayName, adminLink } = {}) {
+  const groupHtml = groups.map(g => {
+    if (!g.items) {
+      return `<a href="${g.href}" class="mobile-link">${g.label}</a>`;
+    }
+    return `
+      <div class="mobile-accordion">
+        <button type="button" class="mobile-accordion-toggle">
+          ${g.label}
+          <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="mobile-accordion-panel">
+          ${g.items.map(i => `<a href="${i.href}" class="mobile-sublink">${i.label}</a>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (!user) {
+    return `
+      ${groupHtml}
+      <div class="mobile-menu-footer">
+        <a href="/login.html" class="btn btn-outline btn-block">Login</a>
+        <a href="/register.html" class="btn btn-primary btn-block mt-1">Get Started</a>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="mobile-user-card">
+      <span class="avatar-circle avatar-circle-lg">${initials(displayName)}</span>
+      <span class="mobile-user-name">${displayName}</span>
+    </div>
+    ${groupHtml}
+    ${adminLink ? `<a href="/admin" class="mobile-link">Admin Panel</a>` : ''}
+    <div class="mobile-menu-footer">
+      <a href="#" id="logout-link-mobile" class="btn btn-outline btn-block">Logout</a>
+    </div>
+  `;
+}
+
 async function updateAuthUI() {
   const supabase = window.supabase;
-  if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
   const nav = document.getElementById('main-nav');
-  const mobileNav = document.getElementById('mobile-menu');
+  const mobileContent = document.getElementById('mobile-menu-content');
+  if (!supabase || !nav) return;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
   if (user) {
-    const { data: profile } = await supabase.from('profiles').select('full_name, is_admin').eq('id', user.id).single();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, is_admin')
+      .eq('id', user.id)
+      .single();
     const displayName = profile?.full_name || user.email;
-    const adminLink = profile?.is_admin ? '<a href="/admin">Admin</a>' : '';
-    const userMenu = `
-      <a href="/dashboard.html">Dashboard</a>
-      <a href="/profile.html">${displayName}</a>
-      ${adminLink}
-      <a href="#" id="logout-link">Logout</a>
-    `;
-    if (nav) nav.innerHTML = userMenu;
-    if (mobileNav) mobileNav.innerHTML = userMenu;
-    document.getElementById('logout-link')?.addEventListener('click', async (e) => {
+    const adminLink = profile?.is_admin ? '<a href="/admin" class="nav-link">Admin</a>' : '';
+
+    nav.innerHTML = renderDesktopNav(NAV_GROUPS_AUTHED, { user, displayName, adminLink });
+    if (mobileContent) mobileContent.innerHTML = renderMobileNav(NAV_GROUPS_AUTHED, { user, displayName, adminLink });
+
+    const logout = async (e) => {
       e.preventDefault();
       await supabase.auth.signOut();
       window.location.href = '/login.html';
-    });
+    };
+    document.getElementById('logout-link')?.addEventListener('click', logout);
+    document.getElementById('logout-link-mobile')?.addEventListener('click', logout);
   } else {
-    const guestMenu = `
-      <a href="/">Home</a>
-      <a href="/login.html">Login</a>
-      <a href="/register.html">Register</a>
-    `;
-    if (nav) nav.innerHTML = guestMenu;
-    if (mobileNav) mobileNav.innerHTML = guestMenu;
+    nav.innerHTML = renderDesktopNav(NAV_GUEST);
+    if (mobileContent) mobileContent.innerHTML = renderMobileNav(NAV_GUEST);
   }
+
+  initDropdowns();
+  initAccordions();
 }
 
-function toggleMobileMenu() {
-  document.getElementById('mobile-menu')?.classList.toggle('active');
+// ------------------------------------------------------------
+// Desktop dropdowns: click to open, click outside to close
+// ------------------------------------------------------------
+function initDropdowns() {
+  const dropdowns = document.querySelectorAll('.nav-dropdown');
+  dropdowns.forEach(dd => {
+    const toggle = dd.querySelector('.dropdown-toggle');
+    toggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = dd.classList.contains('open');
+      dropdowns.forEach(d => d.classList.remove('open'));
+      if (!isOpen) dd.classList.add('open');
+    });
+  });
+  document.addEventListener('click', () => {
+    dropdowns.forEach(d => d.classList.remove('open'));
+  });
+}
+
+// ------------------------------------------------------------
+// Mobile accordions inside the drawer
+// ------------------------------------------------------------
+function initAccordions() {
+  document.querySelectorAll('.mobile-accordion-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.classList.toggle('open');
+    });
+  });
+}
+
+// ------------------------------------------------------------
+// Mobile drawer open/close (hamburger, overlay, close button, Esc)
+// ------------------------------------------------------------
+function initMobileMenu() {
+  const toggleBtn = document.getElementById('mobile-toggle-btn');
+  const closeBtn = document.getElementById('mobile-close-btn');
+  const overlay = document.getElementById('mobile-overlay');
+  const menu = document.getElementById('mobile-menu');
+
+  function open() {
+    menu?.classList.add('active');
+    overlay?.classList.add('active');
+    toggleBtn?.classList.add('active');
+    toggleBtn?.setAttribute('aria-expanded', 'true');
+    menu?.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    menu?.classList.remove('active');
+    overlay?.classList.remove('active');
+    toggleBtn?.classList.remove('active');
+    toggleBtn?.setAttribute('aria-expanded', 'false');
+    menu?.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  function toggle() {
+    menu?.classList.contains('active') ? close() : open();
+  }
+
+  toggleBtn?.addEventListener('click', toggle);
+  closeBtn?.addEventListener('click', close);
+  overlay?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  menu?.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
 }
 
 document.addEventListener('DOMContentLoaded', loadComponents);
