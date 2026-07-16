@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Telegram Integration</h2>
+      <div class="card mb-2">
+        <h4>Configuration</h4>
+        <p>Bot Token and Admin Chat IDs are set via environment variables.</p>
+        <p>Admin Chat IDs: <span id="chat-ids"></span></p>
+      </div>
+      <h4>Recent Notification Logs</h4>
+      <div id="telegram-logs"></div>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    (async () => {
+      const { data: settings } = await supabase.from('settings').select('*').eq('key', 'telegram').single();
+      document.getElementById('chat-ids').textContent = settings?.value?.admin_chat_ids?.join(', ') || 'Not set';
+      const { data: logs } = await supabase.from('telegram_logs').select('*').order('created_at', { ascending: false }).limit(20);
+      document.getElementById('telegram-logs').innerHTML = logs?.map(l => `
+        <div class="card mb-1">
+          <small>${new Date(l.created_at).toLocaleString()}</small> – ${l.event_type}: ${l.message} 
+          <span class="badge ${l.success ? 'badge-success' : 'badge-danger'}">${l.success ? 'OK' : 'Failed'}</span>
+        </div>
+      `).join('') || 'No logs';
+    })();
+  </script>
+</body>
+</html>
