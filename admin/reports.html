@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" class="dark-theme">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html" class="active">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Reports</h2>
+      <div class="widget-grid" id="report-stats"></div>
+      <div class="flex gap-2 mt-3">
+        <button class="btn btn-primary" onclick="exportCSV('transactions')">Export Transactions CSV</button>
+        <button class="btn btn-primary" onclick="exportCSV('deposits')">Export Deposits CSV</button>
+        <button class="btn btn-primary" onclick="exportCSV('withdrawals')">Export Withdrawals CSV</button>
+        <button class="btn btn-primary" onclick="exportCSV('users')">Export Users CSV</button>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    async function loadStats() {
+      const token = await getToken();
+      const res = await fetch('/api/admin?action=stats', { headers: { Authorization: `Bearer ${token}` } });
+      const s = await res.json();
+      document.getElementById('report-stats').innerHTML = `
+        <div class="card stat-card"><div class="stat-value">₦${(s.totalDeposits||0).toLocaleString()}</div><div class="stat-label">Total Deposits</div></div>
+        <div class="card stat-card"><div class="stat-value">₦${(s.totalWithdrawals||0).toLocaleString()}</div><div class="stat-label">Total Withdrawals</div></div>
+        <div class="card stat-card"><div class="stat-value">₦${(s.totalInvestments||0).toLocaleString()}</div><div class="stat-label">Total Investments</div></div>
+        <div class="card stat-card"><div class="stat-value">${s.activeInvestments||0}</div><div class="stat-label">Active Investments</div></div>
+      `;
+    }
+    window.exportCSV = async (table) => {
+      const token = await getToken();
+      window.open(`/api/admin?action=exportCSV&table=${table}`, '_blank');
+    };
+    loadStats();
+  </script>
+</body>
+</html>
