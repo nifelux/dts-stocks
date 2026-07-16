@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Team – DTL Stocks</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <nav class="navbar"><div class="logo"><strong>DTL Stocks</strong></div><ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="team.html" class="active">Team</a></li></ul></nav>
+  <div class="section"><h2>My Downline</h2><div id="team-list"></div></div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient('https://your-project.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+    (async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      const { data } = await supabase.from('profiles').select('full_name, email, created_at').eq('referred_by', user.id);
+      document.getElementById('team-list').innerHTML = data?.map(d => `<div class="card mb-1">${d.full_name||d.email} – Joined ${new Date(d.created_at).toLocaleDateString()}</div>`).join('') || 'No referrals yet.';
+    })();
+  </script>
+</body>
+</html>
