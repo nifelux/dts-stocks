@@ -1,44 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gift Codes – DTL Stocks</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gift Codes – DTL Stocks</title>
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-  <div id="header-container"></div>>
-  <nav class="navbar">
-    <div class="logo"><strong>DTL Stocks</strong></div>
-    <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="gift-codes.html" class="active">Gift Codes</a></li></ul>
-  </nav>
+<div id="header-container"></div>
 
-  <div class="section" style="max-width:400px; margin:auto;">
-    <h2>Redeem Gift Code</h2>
-    <form id="redeem-form">
-      <input type="text" id="code" class="form-input" placeholder="Enter code" required>
-      <button class="btn btn-primary btn-block mt-1">Redeem</button>
-    </form>
-    <div id="result" class="mt-2"></div>
-  </div>
+<div class="section" style="max-width:400px; margin:auto;">
+<h2>Redeem Gift Code</h2>
+<form id="redeem-form">
+<input type="text" id="code" class="form-input" placeholder="Enter code" required>
+<button class="btn btn-primary btn-block mt-1">Redeem</button>
+</form>
+<div id="result" class="mt-2"></div>
+</div>
 
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
 
-    document.getElementById('redeem-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const code = document.getElementById('code').value.trim();
-      const user = (await supabase.auth.getUser()).data.user;
-      // Call RPC function
-      const { data, error } = await supabase.rpc('redeem_gift_code', { p_code: code, p_user_id: user.id });
-      if (error) return alert(error.message);
-      document.getElementById('result').innerHTML = data.success 
-        ? `<div class="alert alert-success">Successfully redeemed ₦${data.amount.toLocaleString()}!</div>`
-        : `<div class="alert alert-danger">${data.message}</div>`;
-    });
-  </script>
-  <div id="footer-container"></div>
-  <script src="/assets/js/components.js"></script>
+// Required so the shared header (assets/js/components.js) can detect
+// the logged-in session — without this it always shows the guest menu.
+window.supabase = supabase;
+
+document.getElementById('redeem-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('code').value.trim();
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return (window.location.href = 'login.html');
+
+  const { data, error } = await supabase.rpc('redeem_gift_code', { p_code: code, p_user_id: user.id });
+  if (error) return alert(error.message);
+
+  document.getElementById('result').innerHTML = data.success
+    ? `<div class="alert alert-success">Successfully redeemed ₦${data.amount.toLocaleString()}!</div>`
+    : `<div class="alert alert-danger">${data.message}</div>`;
+});
+</script>
 </body>
 </html>
