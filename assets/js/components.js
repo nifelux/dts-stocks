@@ -70,15 +70,26 @@ function initials(name) {
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name[0].toUpperCase();
 }
 
+const NAV_ICONS = {
+  Dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>',
+  Invest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+  Wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"/><path d="M21 12h-6a2 2 0 0 0 0 4h6z"/></svg>',
+  Account: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>'
+};
+
+function navIcon(label) {
+  return NAV_ICONS[label] ? `<span class="nav-icon">${NAV_ICONS[label]}</span>` : '';
+}
+
 function renderDesktopNav(groups, { user, displayName, adminLink } = {}) {
   const groupHtml = groups.map(g => {
     if (!g.items) {
-      return `<a href="${g.href}" class="nav-link">${g.label}</a>`;
+      return `<a href="${g.href}" class="nav-link">${navIcon(g.label)}${g.label}</a>`;
     }
     return `
       <div class="nav-dropdown">
         <button type="button" class="nav-link dropdown-toggle">
-          ${g.label}
+          ${navIcon(g.label)}${g.label}
           <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
         <div class="dropdown-menu">
@@ -116,12 +127,12 @@ function renderDesktopNav(groups, { user, displayName, adminLink } = {}) {
 function renderMobileNav(groups, { user, displayName, adminLink } = {}) {
   const groupHtml = groups.map(g => {
     if (!g.items) {
-      return `<a href="${g.href}" class="mobile-link">${g.label}</a>`;
+      return `<a href="${g.href}" class="mobile-link">${navIcon(g.label)}${g.label}</a>`;
     }
     return `
       <div class="mobile-accordion">
         <button type="button" class="mobile-accordion-toggle">
-          ${g.label}
+          <span class="flex items-center">${navIcon(g.label)}${g.label}</span>
           <svg class="chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
         <div class="mobile-accordion-panel">
