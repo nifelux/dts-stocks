@@ -1,49 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Support – DTL Stocks</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support – DTL Stocks</title>
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-  <div id="header-container"></div>>
-  <nav class="navbar">
-    <div class="logo"><strong>DTL Stocks</strong></div>
-    <ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="support.html" class="active">Support</a></li></ul>
-  </nav>
+<div id="header-container"></div>
 
-  <div class="section" style="max-width:600px; margin:auto;">
-    <h2>New Ticket</h2>
-    <form id="ticket-form">
-      <div class="form-group"><input id="subject" class="form-input" placeholder="Subject" required></div>
-      <div class="form-group"><textarea id="message" class="form-textarea" placeholder="Describe your issue..." required></textarea></div>
-      <button class="btn btn-primary btn-block">Submit</button>
-    </form>
-    <h3 class="mt-3">My Tickets</h3>
-    <div id="tickets-list"></div>
-  </div>
+<div class="section" style="max-width:600px; margin:auto;">
+<h2>New Ticket</h2>
+<form id="ticket-form">
+<div class="form-group"><input id="subject" class="form-input" placeholder="Subject" required></div>
+<div class="form-group"><textarea id="message" class="form-textarea" placeholder="Describe your issue..." required></textarea></div>
+<button class="btn btn-primary btn-block">Submit</button>
+</form>
+<h3 class="mt-3">My Tickets</h3>
+<div id="tickets-list"></div>
+</div>
 
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
 
-    document.getElementById('ticket-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const user = (await supabase.auth.getUser()).data.user;
-      await supabase.from('support_tickets').insert({ user_id: user.id, subject: document.getElementById('subject').value, message: document.getElementById('message').value });
-      alert('Ticket created');
-      location.reload();
-    });
+// Required so the shared header (assets/js/components.js) can detect
+// the logged-in session — without this it always shows the guest menu.
+window.supabase = supabase;
 
-    async function loadTickets() {
-      const user = (await supabase.auth.getUser()).data.user;
-      const { data } = await supabase.from('support_tickets').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      document.getElementById('tickets-list').innerHTML = data?.map(t => `<div class="card mb-1"><strong>${t.subject}</strong> – <span class="badge">${t.status}</span></div>`).join('') || 'No tickets';
-    }
-    loadTickets();
-  </script>
-  <div id="footer-container"></div>
-  <script src="/assets/js/components.js"></script>
+document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const user = (await supabase.auth.getUser()).data.user;
+  await supabase.from('support_tickets').insert({ user_id: user.id, subject: document.getElementById('subject').value, message: document.getElementById('message').value });
+  alert('Ticket created');
+  location.reload();
+});
+
+async function loadTickets() {
+  const user = (await supabase.auth.getUser()).data.user;
+  const { data } = await supabase.from('support_tickets').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+  document.getElementById('tickets-list').innerHTML = data?.map(t => `<div class="card mb-1"><strong>${t.subject}</strong> – <span class="badge">${t.status}</span></div>`).join('') || 'No tickets';
+}
+loadTickets();
+</script>
 </body>
 </html>
