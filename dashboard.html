@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard – DTL Stocks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -13,48 +15,104 @@
 
     <div class="dashboard-welcome">
       <div>
+        <div class="dashboard-eyebrow" id="greeting-time">Good morning</div>
         <h2 id="welcome-name">Welcome back</h2>
-        <p class="text-muted" style="margin-bottom:0;">Here's what's happening with your account today.</p>
       </div>
-      <div id="kyc-banner-wrap"></div>
+      <div class="flex items-center">
+        <span class="member-chip" id="member-chip">Member</span>
+        <button class="bell-btn" aria-label="Notifications" onclick="location.href='/messages.html'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+      </div>
     </div>
+
+    <div id="kyc-banner-wrap" class="mb-2"></div>
 
     <div class="balance-card animate-fade">
       <div class="balance-card-top">
-        <span class="balance-label">Available Balance</span>
+        <span class="balance-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          Total Balance
+        </span>
         <div class="balance-amount" id="balance">₦0</div>
       </div>
+
       <div class="balance-sub-grid">
         <div class="balance-sub">
-          <span class="balance-sub-label">Total Deposited</span>
+          <span class="balance-sub-label">Deposited</span>
           <span class="balance-sub-value" id="total-deposited">₦0</span>
         </div>
         <div class="balance-sub">
           <span class="balance-sub-label">Total Earned</span>
-          <span class="balance-sub-value" id="total-earned">₦0</span>
+          <span class="balance-sub-value is-profit" id="total-earned">₦0</span>
         </div>
         <div class="balance-sub">
           <span class="balance-sub-label">Active Investments</span>
           <span class="balance-sub-value" id="active-investments">0</span>
         </div>
       </div>
-      <div class="quick-actions">
-        <a href="/deposit.html" class="quick-action-btn">
-          <span class="quick-action-icon">↓</span> Deposit
+
+      <div class="hero-actions">
+        <a href="/deposit.html" class="hero-btn hero-btn-solid">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Deposit
         </a>
-        <a href="/withdraw.html" class="quick-action-btn">
-          <span class="quick-action-icon">↑</span> Withdraw
-        </a>
-        <a href="/investments.html" class="quick-action-btn">
-          <span class="quick-action-icon">＋</span> Invest
-        </a>
-        <a href="/referral.html" class="quick-action-btn">
-          <span class="quick-action-icon">⇄</span> Refer
+        <a href="/withdraw.html" class="hero-btn hero-btn-outline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          Withdraw
         </a>
       </div>
+
+      <div class="vip-strip" id="vip-strip"></div>
     </div>
 
-    <div class="dashboard-grid mt-3">
+    <div class="icon-grid">
+      <a href="/investments.html" class="icon-tile">
+        <span class="icon-tile-icon tone-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg></span>
+        <span class="icon-tile-label">Products</span>
+      </a>
+      <a href="/referral.html" class="icon-tile">
+        <span class="icon-tile-icon tone-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <span class="icon-tile-label">My Team</span>
+      </a>
+      <a href="/gift-codes.html" class="icon-tile">
+        <span class="icon-tile-icon tone-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></span>
+        <span class="icon-tile-label">Gift Code</span>
+      </a>
+      <a href="/transaction-history.html" class="icon-tile">
+        <span class="icon-tile-icon tone-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
+        <span class="icon-tile-label">History</span>
+      </a>
+      <a href="/messages.html" class="icon-tile">
+        <span class="icon-tile-icon tone-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="icon-tile-label">Messages</span>
+      </a>
+      <a href="/kyc.html" class="icon-tile">
+        <span class="icon-tile-icon tone-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span class="icon-tile-label">KYC</span>
+      </a>
+      <a href="/settings.html" class="icon-tile">
+        <span class="icon-tile-icon tone-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.29.44.73.75 1.24.9H21a2 2 0 0 1 0 4h-.09c-.51.15-.95.46-1.24.9Z"/></svg></span>
+        <span class="icon-tile-label">Settings</span>
+      </a>
+      <a href="/support.html" class="icon-tile">
+        <span class="icon-tile-icon tone-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>
+        <span class="icon-tile-label">Support</span>
+      </a>
+    </div>
+
+    <a href="/referral.html" class="invite-banner">
+      <div>
+        <h4>Invite friends</h4>
+        <p>Earn commission on every deposit they make</p>
+      </div>
+      <span class="invite-btn">
+        Invite Now
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </span>
+    </a>
+
+    <div class="dashboard-grid">
       <div class="card">
         <div class="card-header flex items-center" style="justify-content:space-between;">
           <h3>Recent Transactions</h3>
@@ -81,11 +139,55 @@
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
     );
 
-    // Critical: the shared header (assets/js/components.js) reads
-    // window.supabase to figure out whether you're logged in. Without this
-    // line, the header always falls back to the guest menu — regardless
-    // of whether this page's own auth check succeeds.
+    // Required so the shared header (assets/js/components.js) can detect
+    // the logged-in session — without this it always shows the guest menu.
     window.supabase = supabase;
+
+    const TXN_ICONS = {
+      deposit:      { tone: 'tone-green',  in: true,  svg: '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="5 12 12 19 19 12"/>' },
+      earning:      { tone: 'tone-green',  in: true,  svg: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>' },
+      referral:     { tone: 'tone-purple', in: true,  svg: '<circle cx="9" cy="7" r="4"/><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>' },
+      gift:         { tone: 'tone-yellow', in: true,  svg: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/>' },
+      admin_credit: { tone: 'tone-green',  in: true,  svg: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>' },
+      withdrawal:   { tone: 'tone-ink',    in: false, svg: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>' },
+      admin_debit:  { tone: 'tone-ink',    in: false, svg: '<line x1="5" y1="12" x2="19" y2="12"/>' },
+      investment:   { tone: 'tone-purple', in: false, svg: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>' }
+    };
+
+    function txnIconHtml(type) {
+      const cfg = TXN_ICONS[type] || TXN_ICONS.deposit;
+      const bg = { 'tone-green': '#DDF7EA', 'tone-purple': '#EDE7FF', 'tone-yellow': '#FFF3D6', 'tone-ink': '#EFEDF5' }[cfg.tone];
+      const fg = { 'tone-green': 'var(--clr-green-deep)', 'tone-purple': 'var(--clr-purple-deep)', 'tone-yellow': 'var(--clr-yellow-deep)', 'tone-ink': 'var(--clr-purple-ink)' }[cfg.tone];
+      return `<span class="txn-icon" style="background:${bg};color:${fg};"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cfg.svg}</svg></span>`;
+    }
+
+    function greetingWord() {
+      const h = new Date().getHours();
+      if (h < 12) return 'Good morning';
+      if (h < 17) return 'Good afternoon';
+      return 'Good evening';
+    }
+    document.getElementById('greeting-time').textContent = greetingWord();
+
+    function renderKycBanner(status) {
+      const wrap = document.getElementById('kyc-banner-wrap');
+      if (status === 'approved') {
+        wrap.innerHTML = '';
+      } else if (status === 'pending') {
+        wrap.innerHTML = `<div class="alert alert-info kyc-banner"><span>Your documents are under review.</span></div>`;
+      } else if (status === 'rejected') {
+        wrap.innerHTML = `<div class="alert alert-danger kyc-banner"><span>Your last KYC submission was rejected.</span><a href="/kyc.html" class="btn btn-sm btn-outline">Resubmit</a></div>`;
+      } else {
+        wrap.innerHTML = `<div class="alert alert-danger kyc-banner"><span>Not verified — withdrawals are locked.</span><a href="/kyc.html" class="btn btn-sm btn-primary">Verify Now</a></div>`;
+      }
+    }
+
+    function renderVipStrip(currentLevel) {
+      const levels = ['bronze', 'silver', 'gold', 'platinum'];
+      document.getElementById('vip-strip').innerHTML = levels.map(l =>
+        `<span class="vip-chip ${l === currentLevel ? 'is-active' : ''}">${l}</span>`
+      ).join('');
+    }
 
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -93,38 +195,16 @@
       return user;
     }
 
-    function renderKycBanner(status) {
-      const wrap = document.getElementById('kyc-banner-wrap');
-      if (status === 'approved') {
-        wrap.innerHTML = '<span class="badge badge-success">Verified</span>';
-      } else if (status === 'pending') {
-        wrap.innerHTML = `
-          <div class="alert alert-info kyc-banner">
-            <span>Your documents are under review.</span>
-          </div>`;
-      } else if (status === 'rejected') {
-        wrap.innerHTML = `
-          <div class="alert alert-danger kyc-banner">
-            <span>Your last KYC submission was rejected.</span>
-            <a href="/kyc.html" class="btn btn-sm btn-outline">Resubmit</a>
-          </div>`;
-      } else {
-        wrap.innerHTML = `
-          <div class="alert alert-danger kyc-banner">
-            <span>Not verified — withdrawals are locked.</span>
-            <a href="/kyc.html" class="btn btn-sm btn-primary">Verify Now</a>
-          </div>`;
-      }
-    }
-
     async function loadDashboard(user) {
       const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', user.id).single();
-      const { data: profileKyc } = await supabase.from('profiles').select('kyc_status, full_name').eq('id', user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('kyc_status, full_name, vip_level').eq('id', user.id).single();
 
-      document.getElementById('welcome-name').textContent = profileKyc?.full_name
-        ? `Welcome back, ${profileKyc.full_name.split(' ')[0]}`
+      document.getElementById('welcome-name').textContent = profile?.full_name
+        ? profile.full_name.split(' ')[0]
         : 'Welcome back';
-      renderKycBanner(profileKyc?.kyc_status);
+      document.getElementById('member-chip').textContent = (profile?.vip_level || 'bronze').toUpperCase();
+      renderKycBanner(profile?.kyc_status);
+      renderVipStrip(profile?.vip_level || 'bronze');
 
       document.getElementById('balance').textContent = '₦' + (wallet?.balance || 0).toLocaleString();
       document.getElementById('total-deposited').textContent = '₦' + (wallet?.total_deposited || 0).toLocaleString();
@@ -143,12 +223,18 @@
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
-      const txnHtml = txns?.map(t => `
+      const txnHtml = txns?.map(t => {
+        const cfg = TXN_ICONS[t.type] || TXN_ICONS.deposit;
+        return `
         <div class="txn-row">
-          <span class="badge">${t.type}</span>
-          <span class="currency-ngn">${t.amount.toLocaleString()}</span>
-          <span class="text-muted" style="font-size:0.8rem;">${new Date(t.created_at).toLocaleDateString()}</span>
-        </div>`).join('') || '<p class="text-muted">No transactions yet.</p>';
+          ${txnIconHtml(t.type)}
+          <div class="txn-body">
+            <div class="txn-title">${t.type.replace('_', ' ')}</div>
+            <div class="txn-date">${new Date(t.created_at).toLocaleDateString()}</div>
+          </div>
+          <div class="txn-amount ${cfg.in ? 'is-in' : 'is-out'}">${cfg.in ? '+' : '-'}₦${t.amount.toLocaleString()}</div>
+        </div>`;
+      }).join('') || '<p class="text-muted">No transactions yet.</p>';
       document.getElementById('transactions-list').innerHTML = txnHtml;
 
       const { data: active } = await supabase
@@ -156,12 +242,18 @@
         .select('*, products(name)')
         .eq('user_id', user.id)
         .eq('status', 'active');
-      const invHtml = active?.map(i => `
-        <div class="txn-row">
-          <span>${i.products?.name || 'Investment'}</span>
-          <span class="currency-ngn">${i.amount.toLocaleString()}</span>
-          <span class="text-muted" style="font-size:0.8rem;">Day ${i.days_elapsed}/${i.duration_days} · +₦${i.total_income.toLocaleString()}</span>
-        </div>`).join('') || '<p class="text-muted">No active investments.</p>';
+      const invHtml = active?.map(i => {
+        const pct = Math.min(100, Math.round((i.days_elapsed / i.duration_days) * 100));
+        return `
+        <div class="mb-2">
+          <div class="flex items-center" style="justify-content:space-between;">
+            <strong>${i.products?.name || 'Investment'}</strong>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="text-muted" style="font-size:0.82rem;">₦${i.amount.toLocaleString()} · Day ${i.days_elapsed}/${i.duration_days} · +₦${i.total_income.toLocaleString()}</div>
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>`;
+      }).join('') || '<p class="text-muted">No active investments.</p>';
       document.getElementById('investments-list').innerHTML = invHtml;
     }
 
