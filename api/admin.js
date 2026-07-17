@@ -33,6 +33,9 @@ export default async function handler(req, res) {
       case 'kycList': return kycList(req, res);
       case 'approveKYC': return approveKYC(req, res);
       case 'rejectKYC': return rejectKYC(req, res);
+      case 'giftCodesList': return giftCodesList(req, res);
+      case 'createGiftCode': return createGiftCode(req, res);
+      case 'toggleGiftCode': return toggleGiftCode(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -267,6 +270,14 @@ async function approveKYC(req, res) {
   return res.status(200).json({ message: 'KYC approved' });
 }
 
+// ============================================================
+// Gift code actions (used by admin/gift-codes.html)
+// gift_codes has RLS policy "deny_all_gift" (FOR ALL USING (false)),
+// which blocks direct client access entirely — by design, so gift code
+// creation/management can only happen here, server-side, with the
+// service_role client.
+// ============================================================
+
 async function rejectKYC(req, res) {
   const admin = await verifyAdmin(req);
   const { id, reason } = req.body;
@@ -305,3 +316,70 @@ async function rejectKYC(req, res) {
 
   return res.status(200).json({ message: 'KYC rejected' });
 }
+
+// ============================================================
+// Gift code actions (used by admin/gift-codes.html)
+// gift_codes has RLS policy "deny_all_gift" (FOR ALL USING (false)),
+// which blocks direct client access entirely — by design, so gift code
+// creation/management can only happen here, server-side, with the
+// service_role client.
+// ============================================================
+
+async function giftCodesList(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin
+    .from('gift_codes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function createGiftCode(req, res) {
+  const admin = await verifyAdmin(req);
+  const { code, amount, max_uses } = req.body;
+
+  if (!code || !String(code).trim()) return res.status(400).json({ error: 'Code is required' });
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+
+  const { data, error } = await supabaseAdmin
+    .from('gift_codes')
+    .insert({
+      code: String(code).trim().toUpperCase(),
+      amount: Number(amount),
+      max_uses: max_uses ? Number(max_uses) : 1,
+      created_by: admin.id
+    })
+    .select()
+    .single();
+
+  if (error) {
+    // unique_violation on the code column
+    if (error.code === '23505') return res.status(409).json({ error: 'That code already exists' });
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json(data);
+}
+
+async function toggleGiftCode(req, res) {
+  await verifyAdmin(req);
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Missing id' });
+
+  const { data: existing, error: fetchErr } = await supabaseAdmin
+    .from('gift_codes')
+    .select('is_active')
+    .eq('id', id)
+    .single();
+  if (fetchErr || !existing) return res.status(404).json({ error: 'Gift code not found' });
+
+  const { error } = await supabaseAdmin
+    .from('gift_codes')
+    .update({ is_active: !existing.is_active })
+    .eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.status(200).json({ is_active: !existing.is_active });
+    }
+        
