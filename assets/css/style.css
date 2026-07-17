@@ -210,23 +210,29 @@ body{padding-top:72px}
 }
 
 /* Brand */
-.brand{display:flex;align-items:center;gap:0.4rem;text-decoration:none;font-weight:700;font-size:1.3rem;color:var(--clr-text)}
+.brand{display:flex;align-items:center;gap:0.5rem;text-decoration:none;font-weight:600;font-size:1.25rem;color:var(--clr-text);font-family:var(--font-display)}
 .brand-mark{
-  background:var(--gradient-gold);color:#1c1400;
-  padding:0.2rem 0.5rem;border-radius:8px;font-weight:800;letter-spacing:0.02em;
-  box-shadow:var(--shadow-gold);
+  display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border-radius:10px;
+  background:var(--gradient-purple);color:#fff;
+  font-family:var(--font-family);font-weight:800;font-size:0.85rem;letter-spacing:0.01em;
+  box-shadow:0 6px 16px -6px rgba(76,52,176,0.55);
 }
 .brand-name{letter-spacing:-0.01em}
+.brand-name .accent{color:var(--clr-yellow-deep)}
 
 /* Desktop nav */
 .nav-links{display:flex;align-items:center;gap:0.25rem}
 .nav-link{
-  display:inline-flex;align-items:center;gap:0.3rem;
+  display:inline-flex;align-items:center;gap:0.45rem;
   text-decoration:none;color:var(--clr-text);font-weight:500;font-size:0.95rem;
   padding:0.55rem 0.85rem;border-radius:var(--radius-sm);
   background:none;border:none;cursor:pointer;font-family:inherit;
   transition:background var(--transition),color var(--transition);
 }
+.nav-icon{display:inline-flex;width:17px;height:17px;color:var(--clr-purple-deep);flex-shrink:0}
+.nav-icon svg{width:100%;height:100%}
+.mobile-link .nav-icon,.mobile-accordion-toggle .nav-icon{width:18px;height:18px;margin-right:0.6rem}
 .nav-link:hover{background:var(--clr-surface);color:var(--clr-primary-hover)}
 .chevron{transition:transform var(--transition-slow);opacity:0.6}
 
@@ -257,7 +263,7 @@ body{padding-top:72px}
 .avatar-circle{
   display:inline-flex;align-items:center;justify-content:center;
   width:30px;height:30px;border-radius:50%;
-  background:var(--gradient-gold);color:#1c1400;
+  background:var(--gradient-purple);color:#fff;
   font-size:0.8rem;font-weight:700;flex-shrink:0;
 }
 .avatar-circle-lg{width:48px;height:48px;font-size:1.1rem}
