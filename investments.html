@@ -39,6 +39,10 @@ window.supabase = supabase;
 
 const PRODUCT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>';
 
+async function getToken() {
+  return (await supabase.auth.getSession()).data.session?.access_token;
+}
+
 async function loadProducts() {
   const { data } = await supabase.from('products').select('*').eq('is_locked', false);
   const list = document.getElementById('products-list');
@@ -82,30 +86,31 @@ async function loadProducts() {
       if (product.daily_income_amount != null) {
         // Fixed-price package — no amount prompt, purchase at the set price
         if (confirm(`Invest ₦${product.min_invest.toLocaleString()} in ${product.name}?`)) {
-          invest(productId, product.min_invest, product.daily_income_amount);
+          invest(productId, product.min_invest);
         }
       } else {
         const amount = prompt('Enter amount to invest (₦):');
-        if (amount && +amount > 0) invest(productId, +amount, null);
+        if (amount && +amount > 0) invest(productId, +amount);
       }
     });
   });
 }
 
-async function invest(productId, amount, fixedDailyIncome) {
-  const user = (await supabase.auth.getUser()).data.user;
-  const { data: product } = await supabase.from('products').select('*').eq('id', productId).single();
-  if (amount < product.min_invest) return alert(`Minimum: ₦${product.min_invest}`);
-  const dailyIncome = fixedDailyIncome != null ? fixedDailyIncome : (amount * product.daily_roi_percent) / 100;
-  const { error } = await supabase.from('investments').insert({
-    user_id: user.id, product_id: productId, amount, daily_income: dailyIncome, duration_days: product.duration_days
-  });
-  if (error) {
-    // Purchase-limit trigger raises a plain exception message
-    return alert(error.message.includes('Purchase limit') ? 'You have reached the purchase limit for this product.' : error.message);
+async function invest(productId, amount) {
+  const token = await getToken();
+  try {
+    const res = await fetch('/api/investments?action=createInvestment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ product_id: productId, amount })
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || 'Investment failed.');
+    alert('Investment successful! It is now active and earning.');
+    location.reload();
+  } catch (err) {
+    alert('Something went wrong. Please try again.');
   }
-  alert('Investment created! It will be active upon deposit approval.');
-  location.reload();
 }
 
 async function loadMyInvestments() {
