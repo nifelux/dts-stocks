@@ -59,13 +59,36 @@ async function createInvestment(req, res) {
   if (amount < product.min_invest) return res.status(400).json({ error: `Minimum investment: ₦${product.min_invest}` });
   if (product.max_invest && amount > product.max_invest) return res.status(400).json({ error: `Maximum investment: ₦${product.max_invest}` });
 
+  // Purchase-limit pre-check (friendly message; the DB trigger
+  // trg_enforce_purchase_limit is the real enforcement backstop in
+  // case this endpoint is ever bypassed)
+  if (product.max_purchases_per_user != null) {
+    const { count } = await supabaseAdmin
+      .from('investments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('product_id', product.id);
+    if ((count || 0) >= product.max_purchases_per_user) {
+      return res.status(400).json({ error: `You've reached the purchase limit (${product.max_purchases_per_user}) for this product.` });
+    }
+  }
+
   // Check wallet balance
   const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user.id).single();
   if (wallet.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
 
-  const dailyIncome = (amount * product.daily_roi_percent) / 100;
+  // Fixed-price packages (daily_income_amount set) pay a flat ₦/day
+  // figure directly. Flexible/open-amount products fall back to the
+  // percentage-of-amount calculation.
+  const dailyIncome = product.daily_income_amount != null
+    ? Number(product.daily_income_amount)
+    : (amount * product.daily_roi_percent) / 100;
 
-  // Deduct balance via transaction
+  // Deduct balance via transaction — this INSERT (status already
+  // 'approved') is what trg_process_transaction picks up to actually
+  // subtract from wallets.balance for type='investment'. This is the
+  // step the old client-side direct-insert flow was skipping entirely,
+  // which is why balances weren't being debited.
   const { data: txn, error: txnErr } = await supabaseAdmin.from('transactions').insert({
     user_id: user.id,
     type: 'investment',
@@ -83,7 +106,13 @@ async function createInvestment(req, res) {
     daily_income: dailyIncome,
     duration_days: product.duration_days
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    return res.status(400).json({
+      error: error.message.includes('Purchase limit')
+        ? `You've reached the purchase limit for this product.`
+        : error.message
+    });
+  }
 
   // Log activity
   await supabaseAdmin.from('activity_logs').insert({
@@ -108,9 +137,11 @@ async function myInvestments(req, res) {
 // Admin actions
 async function createProduct(req, res) {
   await verifyAdmin(req);
-  const { name, description, min_invest, max_invest, daily_roi_percent, duration_days } = req.body;
+  const { name, description, min_invest, max_invest, daily_roi_percent, duration_days, daily_income_amount, max_purchases_per_user } = req.body;
   const { data, error } = await supabaseAdmin.from('products').insert({
-    name, description, min_invest, max_invest, daily_roi_percent, duration_days
+    name, description, min_invest, max_invest, daily_roi_percent, duration_days,
+    daily_income_amount: daily_income_amount ?? null,
+    max_purchases_per_user: max_purchases_per_user ?? null
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
   return res.status(200).json(data);
@@ -135,4 +166,4 @@ async function toggleLock(req, res) {
   const { id, is_locked } = req.body;
   await supabaseAdmin.from('products').update({ is_locked }).eq('id', id);
   return res.status(200).json({ message: `Product ${is_locked ? 'locked' : 'unlocked'}` });
-    }
+}
