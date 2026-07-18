@@ -46,38 +46,64 @@ async function loadProducts() {
     list.innerHTML = '<div class="card">No products available yet.</div>';
     return;
   }
-  list.innerHTML = data.map(p => `
+
+  const user = (await supabase.auth.getUser()).data.user;
+  const { data: myInvestments } = await supabase.from('investments').select('product_id').eq('user_id', user.id);
+  const purchaseCounts = {};
+  myInvestments?.forEach(i => { purchaseCounts[i.product_id] = (purchaseCounts[i.product_id] || 0) + 1; });
+
+  list.innerHTML = data.map(p => {
+    const isFixedPackage = p.daily_income_amount != null;
+    const dailyLabel = isFixedPackage ? `₦${p.daily_income_amount.toLocaleString()} / day` : `+${p.daily_roi_percent}% / day`;
+    const owned = purchaseCounts[p.id] || 0;
+    const limit = p.max_purchases_per_user;
+    const atLimit = limit != null && owned >= limit;
+    return `
     <div class="product-card">
       <span class="product-icon">${PRODUCT_ICON}</span>
       <h3>${p.name}</h3>
       <p class="text-muted">${p.description || ''}</p>
       <div class="product-stats">
-        <span class="product-stat roi">+${p.daily_roi_percent}% / day</span>
+        <span class="product-stat roi">${dailyLabel}</span>
         <span class="product-stat duration">${p.duration_days} days</span>
-        <span class="product-stat min">Min ₦${p.min_invest.toLocaleString()}</span>
+        <span class="product-stat min">₦${p.min_invest.toLocaleString()}</span>
+        ${limit != null ? `<span class="product-stat min">${owned}/${limit} purchased</span>` : ''}
       </div>
-      <button class="btn btn-primary btn-block invest-btn" data-id="${p.id}">Invest Now</button>
-    </div>
-  `).join('');
+      <button class="btn btn-primary btn-block invest-btn" data-id="${p.id}" ${atLimit ? 'disabled' : ''}>
+        ${atLimit ? 'Purchase Limit Reached' : (isFixedPackage ? `Invest ₦${p.min_invest.toLocaleString()}` : 'Invest Now')}
+      </button>
+    </div>`;
+  }).join('');
 
-  document.querySelectorAll('.invest-btn').forEach(btn => {
+  document.querySelectorAll('.invest-btn:not([disabled])').forEach(btn => {
     btn.addEventListener('click', () => {
       const productId = btn.dataset.id;
-      const amount = prompt('Enter amount to invest (₦):');
-      if (amount && +amount > 0) invest(productId, +amount);
+      const product = data.find(p => p.id === productId);
+      if (product.daily_income_amount != null) {
+        // Fixed-price package — no amount prompt, purchase at the set price
+        if (confirm(`Invest ₦${product.min_invest.toLocaleString()} in ${product.name}?`)) {
+          invest(productId, product.min_invest, product.daily_income_amount);
+        }
+      } else {
+        const amount = prompt('Enter amount to invest (₦):');
+        if (amount && +amount > 0) invest(productId, +amount, null);
+      }
     });
   });
 }
 
-async function invest(productId, amount) {
+async function invest(productId, amount, fixedDailyIncome) {
   const user = (await supabase.auth.getUser()).data.user;
   const { data: product } = await supabase.from('products').select('*').eq('id', productId).single();
   if (amount < product.min_invest) return alert(`Minimum: ₦${product.min_invest}`);
-  const dailyIncome = (amount * product.daily_roi_percent) / 100;
+  const dailyIncome = fixedDailyIncome != null ? fixedDailyIncome : (amount * product.daily_roi_percent) / 100;
   const { error } = await supabase.from('investments').insert({
     user_id: user.id, product_id: productId, amount, daily_income: dailyIncome, duration_days: product.duration_days
   });
-  if (error) return alert(error.message);
+  if (error) {
+    // Purchase-limit trigger raises a plain exception message
+    return alert(error.message.includes('Purchase limit') ? 'You have reached the purchase limit for this product.' : error.message);
+  }
   alert('Investment created! It will be active upon deposit approval.');
   location.reload();
 }
