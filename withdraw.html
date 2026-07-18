@@ -1,146 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Withdraw – DTL Stocks</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Withdraw – DTL Stocks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-  <div id="header-container"></div>
+<div id="header-container"></div>
 
-  <div class="section" style="max-width:500px; margin:auto;">
+<div class="section dashboard-page" style="max-width:500px;">
+  <div class="page-header">
     <h2>Withdraw Funds</h2>
-
-    <div class="card mb-2" id="balance-note" style="display:none;">
-      <span class="text-muted">Available balance:</span>
-      <strong class="currency-ngn" id="available-balance">0</strong>
-    </div>
-
-    <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
-    <div id="kyc-gate"></div>
-
-    <form id="withdraw-form">
-      <div class="form-group"><label class="form-label">Amount (₦)</label><input type="number" id="amount" class="form-input" required></div>
-      <div class="form-group"><label class="form-label">Bank Name</label><input id="bank_name" class="form-input" required></div>
-      <div class="form-group"><label class="form-label">Account Number</label><input id="account_number" class="form-input" required maxlength="10"></div>
-      <div class="form-group"><label class="form-label">Account Name</label><input id="account_name" class="form-input" required></div>
-      <button type="submit" class="btn btn-primary btn-block" id="withdraw-submit-btn">Request Withdrawal</button>
-    </form>
-
-    <h3 class="mt-3">Withdrawal History</h3>
-    <div id="history">Loading…</div>
+    <p class="text-muted" style="margin-bottom:0;">Cash out to your bank account.</p>
   </div>
 
-  <div id="footer-container"></div>
-  <script src="/assets/js/components.js"></script>
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient(
-      'https://jytmnukzvxirnafukbck.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
-    );
+  <div id="kyc-gate" style="display:none;" class="alert alert-danger kyc-banner mb-2">
+    <span>Identity verification required before you can withdraw.</span>
+    <a href="/kyc.html" class="btn btn-sm btn-primary">Verify Now</a>
+  </div>
 
-    // Required so the shared header (assets/js/components.js) can detect
-    // the logged-in session — without this it always shows the guest menu.
-    window.supabase = supabase;
+  <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
 
-    async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) window.location.href = 'login.html';
-      return user;
-    }
+  <form id="withdraw-form" class="card">
+    <div class="form-group"><label class="form-label">Amount (₦)</label><input type="number" id="amount" class="form-input" required></div>
+    <div class="form-group"><label class="form-label">Bank Name</label><input id="bank_name" class="form-input" required></div>
+    <div class="form-group"><label class="form-label">Account Number</label><input id="account_number" class="form-input" required maxlength="10"></div>
+    <div class="form-group"><label class="form-label">Account Name</label><input id="account_name" class="form-input" required></div>
+    <button type="submit" id="withdraw-submit-btn" class="btn btn-primary btn-block">Request Withdrawal</button>
+  </form>
 
-    function showError(msg) {
-      const el = document.getElementById('error-alert');
-      el.textContent = msg;
-      el.style.display = 'block';
-    }
-    function clearError() {
-      document.getElementById('error-alert').style.display = 'none';
-    }
+  <h3 class="mt-3 mb-2">Withdrawal History</h3>
+  <div id="history"><div class="card">Loading…</div></div>
+</div>
 
-    function statusBadge(status) {
-      const map = { approved: 'badge-success', pending: 'badge-warning', rejected: 'badge-danger' };
-      return `<span class="badge ${map[status] || ''}">${status}</span>`;
-    }
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
 
-    let currentUser = null;
-    let currentBalance = 0;
+// Required so the shared header (assets/js/components.js) can detect
+// the logged-in session — without this it always shows the guest menu.
+window.supabase = supabase;
 
-    async function loadBalanceAndGate(user) {
-      const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-      currentBalance = wallet?.balance || 0;
-      document.getElementById('available-balance').textContent = currentBalance.toLocaleString();
-      document.getElementById('balance-note').style.display = 'block';
+function showError(msg) {
+  const box = document.getElementById('error-alert');
+  box.textContent = msg;
+  box.style.display = 'block';
+}
 
-      const { data: profile } = await supabase.from('profiles').select('kyc_status').eq('id', user.id).single();
-      if (profile?.kyc_status !== 'approved') {
-        document.getElementById('kyc-gate').innerHTML =
-          '<div class="alert alert-danger">KYC verification required. Please <a href="/kyc.html">upload your face and full name</a> for identity verification.</div>';
-        document.getElementById('withdraw-form').style.display = 'none';
-      }
-    }
+document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
+  // preventDefault must run synchronously, before any await
+  e.preventDefault();
+  document.getElementById('error-alert').style.display = 'none';
 
-    document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      clearError();
-      if (!currentUser) return;
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return (window.location.href = 'login.html');
 
-      const { data: settingsRow } = await supabase.from('settings').select('*').eq('key', 'withdrawal').single();
-      const wSet = settingsRow?.value || {};
-      if (wSet.enabled === false) return showError('Withdrawals are currently disabled.');
+  const { data: kycProfile } = await supabase.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (kycProfile?.kyc_status !== 'approved') {
+    return showError('KYC verification required before you can withdraw.');
+  }
 
-      const amount = +document.getElementById('amount').value;
-      const bank_name = document.getElementById('bank_name').value;
-      const account_number = document.getElementById('account_number').value;
-      const account_name = document.getElementById('account_name').value;
+  const { data: settings } = await supabase.from('settings').select('*').eq('key', 'withdrawal').single();
+  const wSet = settings?.value || {};
+  if (!wSet.enabled) return showError('Withdrawals are currently disabled.');
 
-      if (wSet.min_amount && amount < wSet.min_amount) return showError(`Minimum withdrawal is ₦${wSet.min_amount.toLocaleString()}.`);
-      if (wSet.max_amount && amount > wSet.max_amount) return showError(`Maximum withdrawal is ₦${wSet.max_amount.toLocaleString()} per request.`);
-      if (amount > currentBalance) return showError('That amount is more than your available balance.');
+  const amount = +document.getElementById('amount').value;
+  const bank_name = document.getElementById('bank_name').value;
+  const account_number = document.getElementById('account_number').value;
+  const account_name = document.getElementById('account_name').value;
 
-      if (wSet.open_hour != null && wSet.close_hour != null) {
-        const hour = new Date().getHours();
-        if (hour < wSet.open_hour || hour >= wSet.close_hour) {
-          const proceed = confirm(`Withdrawals are processed between ${wSet.open_hour}:00 and ${wSet.close_hour}:00. Your request will be queued for the next window. Continue?`);
-          if (!proceed) return;
-        }
-      }
+  const submitBtn = document.getElementById('withdraw-submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
 
-      const btn = document.getElementById('withdraw-submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Submitting…';
+  const { error } = await supabase.from('withdrawals').insert({
+    user_id: user.id, amount,
+    bank_details: { bank_name, account_number, account_name }
+  });
 
-      const { error } = await supabase.from('withdrawals').insert({
-        user_id: currentUser.id, amount,
-        bank_details: { bank_name, account_number, account_name }
-      });
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Request Withdrawal';
 
-      btn.disabled = false;
-      btn.textContent = 'Request Withdrawal';
+  if (error) return showError(error.message);
+  alert('Withdrawal request submitted!');
+  location.reload();
+});
 
-      if (error) return showError(error.message);
-      alert('Withdrawal request submitted!');
-      location.reload();
-    });
+const STATUS_BADGE = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
 
-    async function loadHistory(user) {
-      const { data } = await supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      document.getElementById('history').innerHTML = data?.map(w => `
-        <div class="txn-row">
-          <span class="currency-ngn">${w.amount.toLocaleString()}</span>
-          ${statusBadge(w.status)}
-          <span class="text-muted" style="font-size:0.8rem;">${new Date(w.created_at).toLocaleDateString()}</span>
-        </div>`).join('') || '<p class="text-muted">No withdrawals yet.</p>';
-    }
+async function loadHistory() {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return;
 
-    checkAuth().then(async (user) => {
-      if (!user) return;
-      currentUser = user;
-      await loadBalanceAndGate(user);
-      await loadHistory(user);
-    });
-  </script>
+  const { data: profile } = await supabase.from('profiles').select('kyc_status').eq('id', user.id).single();
+  if (profile?.kyc_status !== 'approved') {
+    document.getElementById('kyc-gate').style.display = 'flex';
+    document.getElementById('withdraw-form').style.display = 'none';
+  }
+
+  const { data } = await supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+  const container = document.getElementById('history');
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="card text-muted">No withdrawals yet.</div>';
+    return;
+  }
+  container.innerHTML = `<div class="card">${data.map(w => `
+    <div class="txn-row">
+      <span class="txn-icon" style="background:#EFEDF5;color:var(--clr-purple-ink);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </span>
+      <div class="txn-body">
+        <div class="txn-title">₦${w.amount.toLocaleString()}</div>
+        <div class="txn-date">${new Date(w.created_at).toLocaleDateString()}</div>
+      </div>
+      <span class="badge ${STATUS_BADGE[w.status] || ''}">${w.status}</span>
+    </div>
+  `).join('')}</div>`;
+}
+loadHistory();
+</script>
 </body>
 </html>
