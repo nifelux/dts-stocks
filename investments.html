@@ -98,19 +98,30 @@ async function loadProducts() {
 
 async function invest(productId, amount) {
   const token = await getToken();
+  let res;
   try {
-    const res = await fetch('/api/investments?action=createInvestment', {
+    res = await fetch('/api/investments?action=createInvestment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ product_id: productId, amount })
     });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || 'Investment failed.');
-    alert('Investment successful! It is now active and earning.');
-    location.reload();
-  } catch (err) {
-    alert('Something went wrong. Please try again.');
+  } catch (networkErr) {
+    return alert('Network error — could not reach the server. Check your connection and try again.');
   }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    // Response wasn't JSON — usually means the serverless function
+    // crashed or the route doesn't exist, and returned an HTML error
+    // page instead. Surface the status code so it's actually debuggable.
+    return alert(`Server returned an unexpected response (status ${res.status}). Check the Vercel function logs for /api/investments.`);
+  }
+
+  if (!res.ok) return alert(data.error || `Investment failed (status ${res.status}).`);
+  alert('Investment successful! It is now active and earning.');
+  location.reload();
 }
 
 async function loadMyInvestments() {
