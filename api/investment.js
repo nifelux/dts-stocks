@@ -121,7 +121,15 @@ async function createInvestment(req, res) {
     details: { investment_id: investment.id, amount, product: product.name }
   });
 
-  await sendTelegramMessage(`📈 New investment: ₦${amount} in ${product.name} by ${user.email}`);
+  // Notification failures (e.g. Telegram env vars not configured) must
+  // never make an already-successful investment look like it failed —
+  // the money has moved and the investment row exists at this point.
+  try {
+    await sendTelegramMessage(`📈 New investment: ₦${amount} in ${product.name} by ${user.email}`);
+  } catch (notifyErr) {
+    console.error('Telegram notification failed (investment still succeeded):', notifyErr.message);
+  }
+
   return res.status(200).json(investment);
 }
 
@@ -167,3 +175,4 @@ async function toggleLock(req, res) {
   await supabaseAdmin.from('products').update({ is_locked }).eq('id', id);
   return res.status(200).json({ message: `Product ${is_locked ? 'locked' : 'unlocked'}` });
 }
+  
