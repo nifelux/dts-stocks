@@ -4,19 +4,75 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Profile – DTL Stocks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 <div id="header-container"></div>
 
-<div class="section" style="max-width:500px; margin:auto;">
-<h2>Your Profile</h2>
-<form id="profile-form">
-<div class="form-group"><label>Full Name</label><input id="full_name" class="form-input"></div>
-<div class="form-group"><label>Phone</label><input id="phone" class="form-input"></div>
-<button class="btn btn-primary btn-block">Update</button>
-</form>
-<p class="mt-2">VIP Level: <span id="vip-level"></span></p>
+<div class="section dashboard-page" style="max-width:520px;">
+
+  <div class="profile-hero">
+    <div class="profile-avatar" id="profile-avatar">?</div>
+    <h2 id="profile-name">Loading…</h2>
+    <div class="profile-email" id="profile-email"></div>
+    <span class="member-chip" id="profile-vip" style="background:rgba(255,255,255,0.15); color:#fff;">Bronze</span>
+  </div>
+
+  <div class="card mt-3">
+    <h3 class="mb-2">Edit Profile</h3>
+    <form id="profile-form">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input id="full_name" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input id="phone" class="form-input">
+      </div>
+      <button class="btn btn-primary btn-block">Save Changes</button>
+    </form>
+  </div>
+
+  <div class="card mt-2" style="padding:0.5rem 1.25rem;">
+    <a href="/kyc.html" class="settings-row">
+      <span class="settings-row-icon" style="background:#DDF7EA;color:var(--clr-green-deep);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+      </span>
+      <span class="settings-row-text"><strong>Identity Verification</strong><span>KYC status &amp; documents</span></span>
+      <span class="settings-row-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+    <a href="/settings.html" class="settings-row">
+      <span class="settings-row-icon" style="background:#FFF3D6;color:var(--clr-yellow-deep);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.29.44.73.75 1.24.9H21a2 2 0 0 1 0 4h-.09c-.51.15-.95.46-1.24.9Z"/></svg>
+      </span>
+      <span class="settings-row-text"><strong>Settings</strong><span>Password &amp; security</span></span>
+      <span class="settings-row-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+    <a href="/transaction-history.html" class="settings-row">
+      <span class="settings-row-icon" style="background:#EFEDF5;color:var(--clr-purple-ink);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      </span>
+      <span class="settings-row-text"><strong>Transaction History</strong><span>All deposits, withdrawals &amp; earnings</span></span>
+      <span class="settings-row-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+    <a href="/support.html" class="settings-row">
+      <span class="settings-row-icon" style="background:#EDE7FF;color:var(--clr-purple-deep);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+      </span>
+      <span class="settings-row-text"><strong>Support</strong><span>Get help from our team</span></span>
+      <span class="settings-row-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+  </div>
 </div>
 
 <div id="footer-container"></div>
@@ -29,26 +85,39 @@ const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhb
 // the logged-in session — without this it always shows the guest menu.
 window.supabase = supabase;
 
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name[0].toUpperCase();
+}
+
 async function loadProfile() {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) return (window.location.href = 'login.html');
   const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
   document.getElementById('full_name').value = data.full_name || '';
   document.getElementById('phone').value = data.phone || '';
-  document.getElementById('vip-level').textContent = data.vip_level;
+  document.getElementById('profile-name').textContent = data.full_name || user.email;
+  document.getElementById('profile-email').textContent = data.email || user.email;
+  document.getElementById('profile-avatar').textContent = initials(data.full_name || user.email);
+  document.getElementById('profile-vip').textContent = (data.vip_level || 'bronze').toUpperCase();
 }
 
 document.getElementById('profile-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const user = (await supabase.auth.getUser()).data.user;
-  await supabase.from('profiles').update({
+  const { error } = await supabase.from('profiles').update({
     full_name: document.getElementById('full_name').value,
     phone: document.getElementById('phone').value
   }).eq('id', user.id);
+  if (error) return alert(error.message);
   alert('Profile updated');
+  loadProfile();
 });
 
 loadProfile();
 </script>
 </body>
-</html>
+  </html>
+  
