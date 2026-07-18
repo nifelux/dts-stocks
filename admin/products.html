@@ -18,6 +18,7 @@
         <li><a href="products.html" class="active">Products</a></li>
         <li><a href="support.html">Support</a></li>
         <li><a href="kyc.html">KYC</a></li>
+        <li><a href="gift-codes.html">Gift Codes</a></li>
         <li><a href="reports.html">Reports</a></li>
         <li><a href="settings.html">Settings</a></li>
         <li><a href="logs.html">Logs</a></li>
@@ -25,64 +26,165 @@
     </aside>
     <main style="flex:1; padding:2rem;">
       <h2>Investment Products</h2>
-      <button class="btn btn-primary mb-2" onclick="openCreate()">Create Product</button>
-      <table id="products-table"><thead><tr><th>Name</th><th>Daily ROI%</th><th>Duration</th><th>Min Invest</th><th>Locked</th><th>Actions</th></tr></thead><tbody></tbody></table>
-      <div class="modal-overlay" id="product-modal">
-        <div class="modal-content"><h3 id="modal-title">Create Product</h3><div id="modal-body"></div><button class="btn btn-primary mt-2" onclick="closeModal()">Close</button></div>
-      </div>
+      <div id="form-error" class="alert alert-danger" style="display:none;"></div>
+
+      <form id="product-form" class="card mb-2">
+        <h3 class="mb-2" id="form-title">New Product</h3>
+        <input type="hidden" id="product-id">
+
+        <div class="form-group"><input id="name" class="form-input" placeholder="Product name (e.g. Starter Plan)" required></div>
+        <div class="form-group"><textarea id="description" class="form-textarea" placeholder="Short description"></textarea></div>
+
+        <div class="flex gap-2">
+          <div class="form-group" style="flex:1;"><input id="price" type="number" min="1" step="0.01" class="form-input" placeholder="Price (₦)" required></div>
+          <div class="form-group" style="flex:1;"><input id="daily_income" type="number" min="1" step="0.01" class="form-input" placeholder="Daily income (₦)" required></div>
+        </div>
+        <div class="flex gap-2">
+          <div class="form-group" style="flex:1;"><input id="duration_days" type="number" min="1" class="form-input" placeholder="Duration (days)" required></div>
+          <div class="form-group" style="flex:1;"><input id="max_purchases" type="number" min="1" class="form-input" placeholder="Max purchases per user" value="2"></div>
+        </div>
+
+        <button id="submit-btn" class="btn btn-primary">Save Product</button>
+        <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display:none;">Cancel</button>
+      </form>
+
+      <table id="products-table">
+        <thead><tr><th>Name</th><th>Price</th><th>Daily Income</th><th>Duration</th><th>Purchase Limit</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+      </table>
     </main>
   </div>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
-    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
-    async function load() {
-      const token = await getToken();
-      const res = await fetch('/api/investment?action=products', { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      document.querySelector('#products-table tbody').innerHTML = data.map(p => `
-        <tr><td>${p.name}</td><td>${p.daily_roi_percent}%</td><td>${p.duration_days}d</td><td>₦${p.min_invest.toLocaleString()}</td><td>${p.is_locked?'Yes':'No'}</td>
-        <td class="flex gap-1">
-          <button class="btn btn-sm btn-outline" onclick="toggleLock('${p.id}', ${p.is_locked})">${p.is_locked?'Unlock':'Lock'}</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>
-        </td></tr>
-      `).join('');
+    const supabase = createClient(
+      'https://jytmnukzvxirnafukbck.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
+    );
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
     }
-    window.openCreate = () => {
-      document.getElementById('modal-title').textContent = 'Create Product';
-      document.getElementById('modal-body').innerHTML = `
-        <div class="form-group"><input id="p-name" class="form-input" placeholder="Name"></div>
-        <div class="form-group"><input id="p-desc" class="form-input" placeholder="Description"></div>
-        <div class="form-group"><input id="p-roi" class="form-input" type="number" placeholder="Daily ROI %"></div>
-        <div class="form-group"><input id="p-dur" class="form-input" type="number" placeholder="Duration (days)"></div>
-        <div class="form-group"><input id="p-min" class="form-input" type="number" placeholder="Min Invest (₦)"></div>
-        <button class="btn btn-primary" onclick="createProduct()">Save</button>
-      `;
-      document.getElementById('product-modal').classList.add('active');
-    };
-    window.createProduct = async () => {
+
+    // products is fully RLS-locked (deny_all) except the read-only public
+    // policy added for the catalog — writes must go through service_role,
+    // same pattern as gift codes and KYC review.
+    async function getToken() {
+      return (await supabase.auth.getSession()).data.session?.access_token;
+    }
+
+    async function apiCall(action, options = {}) {
       const token = await getToken();
-      await fetch('/api/investment?action=createProduct', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({
-        name: document.getElementById('p-name').value,
-        description: document.getElementById('p-desc').value,
-        daily_roi_percent: +document.getElementById('p-roi').value,
-        duration_days: +document.getElementById('p-dur').value,
-        min_invest: +document.getElementById('p-min').value
-      }) });
-      closeModal(); load();
-    };
-    window.toggleLock = async (id, locked) => {
-      const token = await getToken();
-      await fetch('/api/investment?action=toggleLock', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ id, is_locked: !locked }) });
-      load();
-    };
-    window.deleteProduct = async (id) => {
-      if (!confirm('Delete?')) return;
-      const token = await getToken();
-      await fetch('/api/investment?action=deleteProduct', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ id }) });
-      load();
-    };
-    window.closeModal = () => document.getElementById('product-modal').classList.remove('active');
+      const res = await fetch(`/api/admin?action=${action}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    async function load() {
+      const tbody = document.querySelector('#products-table tbody');
+      try {
+        const data = await apiCall('productsList');
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7">No products yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.map(p => `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>₦${Number(p.min_invest).toLocaleString()}</td>
+            <td>${p.daily_income_amount != null ? '₦' + Number(p.daily_income_amount).toLocaleString() + '/day' : p.daily_roi_percent + '%/day'}</td>
+            <td>${p.duration_days} days</td>
+            <td>${p.max_purchases_per_user ?? 'Unlimited'}</td>
+            <td>${p.is_locked ? '<span class="badge">Locked</span>' : '<span class="badge badge-success">Live</span>'}</td>
+            <td>
+              <button class="btn btn-sm btn-outline" data-edit="${p.id}">Edit</button>
+              <button class="btn btn-sm ${p.is_locked ? 'btn-success' : 'btn-danger'}" data-toggle="${p.id}" data-locked="${p.is_locked}">
+                ${p.is_locked ? 'Unlock' : 'Lock'}
+              </button>
+            </td>
+          </tr>
+        `).join('');
+        window.__products = data;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    document.querySelector('#products-table tbody').addEventListener('click', async (e) => {
+      const editId = e.target.dataset.edit;
+      const toggleId = e.target.dataset.toggle;
+
+      if (editId) {
+        const p = window.__products.find(x => x.id === editId);
+        document.getElementById('form-title').textContent = 'Edit Product';
+        document.getElementById('product-id').value = p.id;
+        document.getElementById('name').value = p.name;
+        document.getElementById('description').value = p.description || '';
+        document.getElementById('price').value = p.min_invest;
+        document.getElementById('daily_income').value = p.daily_income_amount ?? '';
+        document.getElementById('duration_days').value = p.duration_days;
+        document.getElementById('max_purchases').value = p.max_purchases_per_user ?? '';
+        document.getElementById('cancel-edit-btn').style.display = 'inline-flex';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      if (toggleId) {
+        e.target.disabled = true;
+        try {
+          await apiCall('toggleProductLock', { method: 'POST', body: JSON.stringify({ id: toggleId }) });
+          load();
+        } catch (err) {
+          alert(err.message);
+          e.target.disabled = false;
+        }
+      }
+    });
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+      document.getElementById('product-form').reset();
+      document.getElementById('product-id').value = '';
+      document.getElementById('form-title').textContent = 'New Product';
+      document.getElementById('cancel-edit-btn').style.display = 'none';
+    });
+
+    document.getElementById('product-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('form-error');
+      const submitBtn = document.getElementById('submit-btn');
+      errorBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+
+      const id = document.getElementById('product-id').value;
+      const payload = {
+        id: id || undefined,
+        name: document.getElementById('name').value,
+        description: document.getElementById('description').value,
+        price: +document.getElementById('price').value,
+        daily_income: +document.getElementById('daily_income').value,
+        duration_days: +document.getElementById('duration_days').value,
+        max_purchases: document.getElementById('max_purchases').value ? +document.getElementById('max_purchases').value : null
+      };
+
+      try {
+        await apiCall(id ? 'updateProduct' : 'createProduct', { method: 'POST', body: JSON.stringify(payload) });
+        document.getElementById('cancel-edit-btn').click();
+        load();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Product';
+      }
+    });
+
     load();
   </script>
 </body>
