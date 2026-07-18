@@ -36,6 +36,10 @@ export default async function handler(req, res) {
       case 'giftCodesList': return giftCodesList(req, res);
       case 'createGiftCode': return createGiftCode(req, res);
       case 'toggleGiftCode': return toggleGiftCode(req, res);
+      case 'productsList': return productsList(req, res);
+      case 'createProduct': return createProduct(req, res);
+      case 'updateProduct': return updateProduct(req, res);
+      case 'toggleProductLock': return toggleProductLock(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -381,5 +385,109 @@ async function toggleGiftCode(req, res) {
   if (error) return res.status(500).json({ error: error.message });
 
   return res.status(200).json({ is_active: !existing.is_active });
-    }
-        
+}
+
+// ============================================================
+// Product management actions (used by admin/products.html)
+// products has RLS: a public read-only policy (is_locked = false) plus
+// deny_all for everything else — so writes must go through here with
+// supabaseAdmin (service_role), same pattern as gift codes.
+// ============================================================
+
+async function productsList(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+function validateProductPayload(body) {
+  const { name, price, daily_income, duration_days } = body;
+  if (!name || !String(name).trim()) return 'Product name is required';
+  if (!price || Number(price) <= 0) return 'Price must be greater than 0';
+  if (!daily_income || Number(daily_income) <= 0) return 'Daily income must be greater than 0';
+  if (!duration_days || Number(duration_days) <= 0) return 'Duration must be greater than 0';
+  return null;
+}
+
+async function createProduct(req, res) {
+  await verifyAdmin(req);
+  const err = validateProductPayload(req.body);
+  if (err) return res.status(400).json({ error: err });
+
+  const { name, description, price, daily_income, duration_days, max_purchases } = req.body;
+  // daily_roi_percent is kept populated (informational) since the column
+  // is NOT NULL with a > 0 check — the app itself uses daily_income_amount
+  // directly for fixed-price packages like this one, not this percentage.
+  const impliedPercent = (Number(daily_income) / Number(price)) * 100;
+
+  const { data, error } = await supabaseAdmin
+    .from('products')
+    .insert({
+      name: String(name).trim(),
+      description: description || null,
+      min_invest: Number(price),
+      max_invest: Number(price),
+      daily_roi_percent: Number(impliedPercent.toFixed(2)),
+      daily_income_amount: Number(daily_income),
+      duration_days: Number(duration_days),
+      max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
+      is_locked: false
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function updateProduct(req, res) {
+  await verifyAdmin(req);
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Missing id' });
+  const err = validateProductPayload(req.body);
+  if (err) return res.status(400).json({ error: err });
+
+  const { name, description, price, daily_income, duration_days, max_purchases } = req.body;
+  const impliedPercent = (Number(daily_income) / Number(price)) * 100;
+
+  const { error } = await supabaseAdmin
+    .from('products')
+    .update({
+      name: String(name).trim(),
+      description: description || null,
+      min_invest: Number(price),
+      max_invest: Number(price),
+      daily_roi_percent: Number(impliedPercent.toFixed(2)),
+      daily_income_amount: Number(daily_income),
+      duration_days: Number(duration_days),
+      max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ message: 'Product updated' });
+}
+
+async function toggleProductLock(req, res) {
+  await verifyAdmin(req);
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Missing id' });
+
+  const { data: existing, error: fetchErr } = await supabaseAdmin
+    .from('products').select('is_locked').eq('id', id).single();
+  if (fetchErr || !existing) return res.status(404).json({ error: 'Product not found' });
+
+  const { error } = await supabaseAdmin
+    .from('products')
+    .update({ is_locked: !existing.is_locked, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.status(200).json({ is_locked: !existing.is_locked });
+  }
+    
