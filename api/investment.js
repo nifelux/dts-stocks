@@ -2,6 +2,7 @@
  * Investment API
  * Actions: products (list public), createInvestment, myInvestments, productDetail
  * Admin actions: createProduct, updateProduct, deleteProduct, toggleLock
+ * Cron actions (moved from cron.js): triggerDailyIncome, cronStatus
  */
 import supabaseAdmin from '../lib/supabase.js';
 import { verifyUser, verifyAdmin } from '../lib/auth.js';
@@ -21,6 +22,9 @@ export default async function handler(req, res) {
       case 'updateProduct': return updateProduct(req, res);
       case 'deleteProduct': return deleteProduct(req, res);
       case 'toggleLock': return toggleLock(req, res);
+      // Cron management (moved from cron.js — same domain: investment payouts)
+      case 'triggerDailyIncome': return triggerDailyIncome(req, res);
+      case 'cronStatus': return getCronStatus(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -85,10 +89,8 @@ async function createInvestment(req, res) {
     : (amount * product.daily_roi_percent) / 100;
 
   // Deduct balance via transaction — this INSERT (status already
-  // 'approved') is what trg_process_transaction picks up to actually
-  // subtract from wallets.balance for type='investment'. This is the
-  // step the old client-side direct-insert flow was skipping entirely,
-  // which is why balances weren't being debited.
+  // 'approved') is what the trg_process_transaction trigger picks up
+  // to actually subtract from wallets.balance for type='investment'.
   const { data: txn, error: txnErr } = await supabaseAdmin.from('transactions').insert({
     user_id: user.id,
     type: 'investment',
@@ -121,9 +123,9 @@ async function createInvestment(req, res) {
     details: { investment_id: investment.id, amount, product: product.name }
   });
 
-  // Notification failures (e.g. Telegram env vars not configured) must
-  // never make an already-successful investment look like it failed —
-  // the money has moved and the investment row exists at this point.
+  // Notification failures must never make an already-successful
+  // investment look like it failed — the money has moved and the
+  // investment row exists at this point.
   try {
     await sendTelegramMessage(`📈 New investment: ₦${amount} in ${product.name} by ${user.email}`);
   } catch (notifyErr) {
@@ -175,4 +177,20 @@ async function toggleLock(req, res) {
   await supabaseAdmin.from('products').update({ is_locked }).eq('id', id);
   return res.status(200).json({ message: `Product ${is_locked ? 'locked' : 'unlocked'}` });
 }
-  
+
+// ============================================================
+// Cron management (moved from cron.js)
+// ============================================================
+
+async function triggerDailyIncome(req, res) {
+  await verifyAdmin(req);
+  const { error } = await supabaseAdmin.rpc('distribute_daily_income');
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ message: 'Daily income distribution completed' });
+}
+
+async function getCronStatus(req, res) {
+  await verifyAdmin(req);
+  const { data } = await supabaseAdmin.from('cron_logs').select('*').order('created_at', { ascending: false }).limit(10);
+  return res.status(200).json(data);
+}
