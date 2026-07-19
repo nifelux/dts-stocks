@@ -27,12 +27,11 @@ export default async function handler(req, res) {
   }
 }
 
+// Deposits don't require KYC — only withdrawals do. (Previously both
+// createDeposit and listDeposits carried a copy-pasted withdrawal KYC
+// gate that blocked deposits entirely for unverified users.)
 async function createDeposit(req, res) {
   const user = await verifyUser(req);
-  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
-  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
-    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
-  }
   const { amount, payment_method, proof_image_url } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
@@ -48,10 +47,6 @@ async function createDeposit(req, res) {
 
 async function listDeposits(req, res) {
   const user = await verifyUser(req);
-  const { data: kycCheck } = await supabaseAdmin.from('profiles').select('kyc_status').eq('id', user.id).single();
-  if (!kycCheck || kycCheck.kyc_status !== 'approved') {
-    return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
-  }
   // User sees own; if admin, we'll handle in admin api. But here just own.
   const { data } = await supabaseAdmin.from('deposits').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
   return res.status(200).json(data);
@@ -95,7 +90,7 @@ async function createWithdrawal(req, res) {
   if (!kycCheck || kycCheck.kyc_status !== 'approved') {
     return res.status(400).json({ error: 'KYC verification required to withdraw. Please upload your face and full name on the KYC page.' });
   }
-  const { amount, bank_name, account_number, account_name } = req.body;
+  const { amount, bank_code, bank_name, account_number, account_name } = req.body;
   try { withdrawSchema.parse(req.body); } catch (e) { return res.status(400).json({ error: e.errors[0].message }); }
 
   // Check withdrawal settings
@@ -120,9 +115,11 @@ async function createWithdrawal(req, res) {
   const { data: existing } = await supabaseAdmin.from('withdrawals').select('id').eq('user_id', user.id).eq('status', 'pending').maybeSingle();
   if (existing) return res.status(400).json({ error: 'You already have a pending withdrawal' });
 
+  // bank_code is required downstream by the Nekpay payout endpoint
+  // (api/withdraw-payout.js) — stored here alongside the display name.
   const { data, error } = await supabaseAdmin.from('withdrawals').insert({
     user_id: user.id, amount,
-    bank_details: { bank_name, account_number, account_name },
+    bank_details: { bank_code, bank_name, account_number, account_name },
     status: 'pending'
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
@@ -174,4 +171,4 @@ async function rejectWithdrawal(req, res) {
   await supabaseAdmin.from('withdrawals').update({ status: 'rejected', admin_notes, updated_at: new Date() }).eq('id', withdrawal_id);
   await sendTelegramMessage(`❌ Withdrawal rejected: ${withdrawal_id}`);
   return res.status(200).json({ message: 'Withdrawal rejected' });
-    }
+}
