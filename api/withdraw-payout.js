@@ -98,8 +98,18 @@ async function handleTrigger(req, res) {
     return res.status(400).json({ success: false, error: `Withdrawal must be approved first (current status: ${withdrawal.status})` });
   }
 
-  if (withdrawal.payout_status === 'success' || withdrawal.payout_status === 'processing') {
-    return res.status(409).json({ success: false, error: `Payout already ${withdrawal.payout_status} for this withdrawal — refusing to send twice.` });
+  if (withdrawal.payout_status === 'success') {
+    return res.status(409).json({ success: false, error: 'Payout already succeeded for this withdrawal — refusing to send twice.' });
+  }
+
+  if (withdrawal.payout_status === 'processing') {
+    const requestedAt = withdrawal.payout_requested_at ? new Date(withdrawal.payout_requested_at).getTime() : 0;
+    const ageMs = Date.now() - requestedAt;
+    const STALE_AFTER_MS = 5 * 60 * 1000; // 5 minutes — Nekpay's sync response arrives immediately, so anything still "processing" this long after was likely a crash mid-request, not a real in-flight call.
+    if (ageMs < STALE_AFTER_MS) {
+      return res.status(409).json({ success: false, error: `Payout request sent ${Math.round(ageMs / 1000)}s ago and still processing — wait a bit before retrying.` });
+    }
+    // Stale — fall through and let this attempt proceed.
   }
 
   const bankDetails = withdrawal.bank_details || {};
