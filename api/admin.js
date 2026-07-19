@@ -2,7 +2,8 @@
  * Admin API – Comprehensive management actions
  * Actions: stats, users, freezeUser, banUser, unbanUser, creditWallet, debitWallet,
  *          lockWithdrawals, openWithdrawals, maintenanceMode, settingsGet, settingsUpdate,
- *          broadcast, getAuditLogs, getActivityLogs, exportCSV, kycList, approveKYC, rejectKYC
+ *          broadcast, getAuditLogs, getActivityLogs, exportCSV, kycList, approveKYC, rejectKYC,
+ *          withdrawalsList
  */
 import supabaseAdmin from '../lib/supabase.js';
 import { verifyAdmin } from '../lib/auth.js';
@@ -40,6 +41,7 @@ export default async function handler(req, res) {
       case 'createProduct': return createProduct(req, res);
       case 'updateProduct': return updateProduct(req, res);
       case 'toggleProductLock': return toggleProductLock(req, res);
+      case 'withdrawalsList': return withdrawalsList(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -207,6 +209,30 @@ async function getSetting(key) {
 }
 
 // ============================================================
+// Withdrawals review (used by admin/withdrawals.html)
+// Separate from api/finance.js's listWithdrawals, which is scoped to
+// the calling user only (eq('user_id', user.id)) — admins need every
+// user's withdrawals, filterable by status, so this is its own action
+// on the admin-only, service_role-backed endpoint.
+// ============================================================
+
+async function withdrawalsList(req, res) {
+  await verifyAdmin(req);
+  const { status } = req.query;
+
+  let query = supabaseAdmin
+    .from('withdrawals')
+    .select('*, profiles(email, full_name)')
+    .order('created_at', { ascending: false });
+
+  if (status) query = query.eq('status', status);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+// ============================================================
 // KYC review actions (used by admin/kyc.html)
 // image_url on kyc_documents is a private storage PATH (e.g.
 // "<user_id>/selfie_169....jpg"), not a public URL — it must be resolved
@@ -273,14 +299,6 @@ async function approveKYC(req, res) {
 
   return res.status(200).json({ message: 'KYC approved' });
 }
-
-// ============================================================
-// Gift code actions (used by admin/gift-codes.html)
-// gift_codes has RLS policy "deny_all_gift" (FOR ALL USING (false)),
-// which blocks direct client access entirely — by design, so gift code
-// creation/management can only happen here, server-side, with the
-// service_role client.
-// ============================================================
 
 async function rejectKYC(req, res) {
   const admin = await verifyAdmin(req);
@@ -489,5 +507,4 @@ async function toggleProductLock(req, res) {
   if (error) return res.status(500).json({ error: error.message });
 
   return res.status(200).json({ is_locked: !existing.is_locked });
-  }
-    
+}
