@@ -61,7 +61,7 @@ document.getElementById('deposit-form').addEventListener('submit', async (e) => 
   submitBtn.textContent = 'Redirecting to payment…';
 
   try {
-    const res = await fetch('/api/nekpayment?action=initiateDeposit', {
+    const res = await fetch('/api/webhook?action=initiateDeposit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ amount })
