@@ -64,8 +64,9 @@
       if (w.status === 'pending') {
         return `<button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Approve</button> <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject</button>`;
       }
-      if (w.status === 'approved' && w.payout_status !== 'success' && w.payout_status !== 'processing') {
-        return `<button class="btn btn-sm btn-primary" onclick="sendPayout('${w.id}')">Send Payout</button>`;
+      if (w.status === 'approved' && w.payout_status !== 'success') {
+        const label = (w.payout_status === 'processing' || w.payout_status === 'failed') ? 'Retry Payout' : 'Send Payout';
+        return `<button class="btn btn-sm btn-primary" onclick="sendPayout('${w.id}')">${label}</button>`;
       }
       return '';
     }
@@ -107,15 +108,19 @@
       load();
     };
 
-    // Sends an already-approved withdrawal to Nekpay for disbursement
-    // (api/withdraw-payout.js). Only shown once status is 'approved' and
-    // no successful/in-flight payout already exists for it.
     window.sendPayout = async (id) => {
       clearError();
-      const token = await getToken();
-      const res = await fetch('/api/withdraw-payout', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
-      const json = await res.json();
-      if (!res.ok || !json.success) { showError(json.error || 'Payout request failed'); }
+      try {
+        const token = await getToken();
+        const res = await fetch('/api/withdraw-payout', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          showError(json.error || `Payout request failed (${res.status})`);
+        }
+      } catch (err) {
+        console.error('sendPayout failed:', err);
+        showError(`Could not reach the payout endpoint: ${err.message}`);
+      }
       load();
     };
 
