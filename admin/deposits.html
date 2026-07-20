@@ -26,42 +26,104 @@
     <main style="flex:1; padding:2rem;">
       <h2>Deposits</h2>
       <div class="flex gap-2 mb-2">
-        <select id="status-filter" class="form-select"><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+        <select id="status-filter" class="form-select">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
         <button class="btn btn-primary" id="load-btn">Load</button>
       </div>
-      <table id="deposits-table"><thead><tr><th>User</th><th>Amount</th><th>Proof</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>
+      <table id="deposits-table">
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Amount</th>
+            <th>Method</th>
+            <th>Proof</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </main>
   </div>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
     const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
-    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    
+    async function getToken() { 
+      return (await supabase.auth.getSession()).data.session?.access_token; 
+    }
+
     async function load() {
       const status = document.getElementById('status-filter').value;
       const token = await getToken();
       const res = await fetch(`/api/admin?action=deposits&status=${status}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       const tbody = document.querySelector('#deposits-table tbody');
-      tbody.innerHTML = data.map(d => `
-        <tr>
-          <td>${d.user_id?.slice(0,8)}</td>
-          <td>₦${d.amount.toLocaleString()}</td>
-          <td>${d.proof_image_url ? `<a href="${d.proof_image_url}" target="_blank">View</a>` : 'None'}</td>
-          <td>${d.status}</td>
-          <td>${d.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="approve('${d.id}')">Approve</button> <button class="btn btn-sm btn-danger" onclick="reject('${d.id}')">Reject</button>` : ''}</td>
-        </tr>
-      `).join('');
+      
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No deposit records found.</td></tr>';
+        return;
+      }
+
+      // Generate signed URLs for private proof image paths
+      const rows = await Promise.all(data.map(async (d) => {
+        let proofLink = 'None';
+        if (d.proof_image_url) {
+          // Check if proof_image_url is already a full URL or relative storage path
+          if (d.proof_image_url.startsWith('http')) {
+            proofLink = `<a href="${d.proof_image_url}" target="_blank" class="btn btn-sm btn-outline">View</a>`;
+          } else {
+            const { data: signedData } = await supabase.storage.from('proofs').createSignedUrl(d.proof_image_url, 3600);
+            if (signedData?.signedUrl) {
+              proofLink = `<a href="${signedData.signedUrl}" target="_blank" class="btn btn-sm btn-outline">View Receipt</a>`;
+            }
+          }
+        }
+
+        return `
+          <tr>
+            <td>${d.user_id?.slice(0,8)}</td>
+            <td>₦${Number(d.amount).toLocaleString()}</td>
+            <td>${d.payment_method || 'bank_transfer'}</td>
+            <td>${proofLink}</td>
+            <td><span class="badge">${d.status}</span></td>
+            <td>${d.status === 'pending' ? `
+              <button class="btn btn-sm btn-success" onclick="approve('${d.id}')">Approve</button>
+              <button class="btn btn-sm btn-danger" onclick="reject('${d.id}')">Reject</button>
+            ` : '-'}</td>
+          </tr>
+        `;
+      }));
+
+      tbody.innerHTML = rows.join('');
     }
+
     window.approve = async (id) => {
+      if (!confirm('Approve this deposit and credit user wallet?')) return;
       const token = await getToken();
-      await fetch('/api/finance?action=approveDeposit', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ deposit_id: id }) });
+      await fetch('/api/finance?action=approveDeposit', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ deposit_id: id }) 
+      });
       load();
     };
+
     window.reject = async (id) => {
+      const reason = prompt('Reason for rejection:');
+      if (reason === null) return;
       const token = await getToken();
-      await fetch('/api/finance?action=rejectDeposit', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ deposit_id: id }) });
+      await fetch('/api/finance?action=rejectDeposit', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ deposit_id: id, admin_notes: reason }) 
+      });
       load();
     };
+
     document.getElementById('load-btn').addEventListener('click', load);
     load();
   </script>
