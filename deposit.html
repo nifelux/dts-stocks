@@ -14,7 +14,7 @@
 <div class="section dashboard-page" style="max-width:480px;">
   <div class="page-header">
     <h2>Deposit Funds</h2>
-    <p class="text-muted" style="margin-bottom:0;">Make a bank transfer to the details below, then upload your payment screenshot.</p>
+    <p class="text-muted" style="margin-bottom:0;">Make a bank transfer to the details below, then enter your transfer sender details.</p>
   </div>
 
   <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
@@ -44,9 +44,8 @@
     </div>
 
     <div class="form-group mb-3">
-      <label class="form-label">Proof of Payment Screenshot</label>
-      <input type="file" id="proof_image" class="form-input" accept="image/*" required>
-      <small class="text-muted">Upload transfer receipt or screenshot (JPG, PNG)</small>
+      <label class="form-label">Sender Name & Bank Used</label>
+      <textarea id="sender_details" class="form-input" rows="3" placeholder="Enter Sender Full Name and Bank Name used for transfer (e.g. John Doe - OPay)" required></textarea>
     </div>
 
     <button type="submit" id="deposit-submit-btn" class="btn btn-primary btn-block">Submit Deposit Request</button>
@@ -88,38 +87,25 @@ document.getElementById('deposit-form').addEventListener('submit', async (e) => 
 
   const amount = +document.getElementById('amount').value;
   const payment_method = document.getElementById('payment_method').value;
-  const fileInput = document.getElementById('proof_image');
-  const file = fileInput.files[0];
+  const sender_details = document.getElementById('sender_details').value.trim();
 
-  if (!file) {
-    showError('Please upload payment receipt screenshot.');
+  if (!sender_details) {
+    showError('Please enter your sender name and bank name.');
     return;
   }
 
   const submitBtn = document.getElementById('deposit-submit-btn');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Uploading proof & submitting…';
+  submitBtn.textContent = 'Submitting request…';
 
   try {
-    // 1. Upload proof receipt to 'proofs' bucket inside user-owned directory
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
-
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from('proofs')
-      .upload(filePath, file);
-
-    if (uploadError) throw new Error('Proof upload failed: ' + uploadError.message);
-
-    // 2. Call createDeposit API with relative storage path
     const res = await fetch('/api/finance?action=createDeposit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({
         amount,
         payment_method,
-        proof_image_url: uploadData.path
+        payment_details: sender_details
       })
     });
 
