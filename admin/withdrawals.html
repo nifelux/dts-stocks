@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Withdrawals – Admin</title>
+  <title>Manual Withdrawals – Admin</title>
   <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
@@ -24,24 +24,46 @@
       </ul>
     </aside>
     <main style="flex:1; padding:2rem;">
-      <h2>Withdrawals</h2>
+      <h2>Manual Withdrawal Management</h2>
+      <p class="text-muted mb-2">Review pending requests, send the bank transfer manually, then click Approve to complete.</p>
+
       <div class="flex gap-2 mb-2">
         <select id="status-filter" class="form-select">
           <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
+          <option value="approved">Approved (Paid)</option>
           <option value="rejected">Rejected</option>
         </select>
         <button class="btn btn-primary" id="load-btn">Load</button>
       </div>
+
       <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
-      <table id="withdrawals-table"><thead><tr><th>User</th><th>Amount</th><th>Bank</th><th>Status</th><th>Payout</th><th>Action</th></tr></thead><tbody></tbody></table>
+
+      <table id="withdrawals-table" class="table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Bank Details</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </main>
   </div>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+    const supabase = createClient(
+      'https://jytmnukzvxirnafukbck.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
+    );
 
-    async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
+    async function getToken() { 
+      return (await supabase.auth.getSession()).data.session?.access_token; 
+    }
 
     function showError(msg) {
       const el = document.getElementById('error-alert');
@@ -52,22 +74,15 @@
       document.getElementById('error-alert').style.display = 'none';
     }
 
-    function payoutCell(w) {
-      if (w.status !== 'approved') return '<span class="text-muted">—</span>';
-      if (w.payout_status === 'success') return '<span class="badge badge-success">Paid</span>';
-      if (w.payout_status === 'processing') return '<span class="badge badge-warning">Sending…</span>';
-      if (w.payout_status === 'failed') return '<span class="badge badge-danger">Failed</span>';
-      return '<span class="badge">Not sent</span>';
-    }
-
     function actionCell(w) {
       if (w.status === 'pending') {
-        return `<button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Approve</button> <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject</button>`;
+        return `
+          <button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Mark as Paid</button> 
+          <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject & Refund</button>
+        `;
       }
-      if (w.status === 'approved' && w.payout_status !== 'success') {
-        const label = (w.payout_status === 'processing' || w.payout_status === 'failed') ? 'Retry Payout' : 'Send Payout';
-        return `<button class="btn btn-sm btn-primary" onclick="sendPayout('${w.id}')">${label}</button>`;
-      }
+      if (w.status === 'approved') return '<span class="badge badge-success">Completed</span>';
+      if (w.status === 'rejected') return '<span class="badge badge-danger">Refunded</span>';
       return '';
     }
 
@@ -75,52 +90,64 @@
       clearError();
       const status = document.getElementById('status-filter').value;
       const token = await getToken();
-      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { headers: { Authorization: `Bearer ${token}` } });
+
+      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Failed to load withdrawals'); return; }
+
+      if (!res.ok) { 
+        showError(data.error || 'Failed to load withdrawals'); 
+        return; 
+      }
 
       const tbody = document.querySelector('#withdrawals-table tbody');
-      tbody.innerHTML = data.map(w => `
-        <tr>
-          <td>${w.profiles?.email || w.user_id?.slice(0,8)}</td>
-          <td>₦${w.amount.toLocaleString()}</td>
-          <td>${w.bank_details?.bank_name || ''} ${w.bank_details?.account_number || ''}</td>
-          <td>${w.status}</td>
-          <td>${payoutCell(w)}</td>
-          <td>${actionCell(w)}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="6" class="text-muted">No withdrawals in this status.</td></tr>';
+      tbody.innerHTML = data.map(w => {
+        const bank = w.bank_details || {};
+        return `
+          <tr>
+            <td>
+              <strong>${w.profiles?.full_name || 'No Name'}</strong><br>
+              <small class="text-muted">${w.profiles?.email || w.user_id?.slice(0,8)}</small>
+            </td>
+            <td><strong>₦${Number(w.amount).toLocaleString()}</strong></td>
+            <td>
+              <strong>${bank.bank_name || 'N/A'}</strong><br>
+              <code>${bank.account_number || ''}</code> (${bank.account_name || ''})
+            </td>
+            <td><span class="badge badge-${w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'danger' : 'warning'}">${w.status}</span></td>
+            <td><small>${new Date(w.created_at).toLocaleDateString()}</small></td>
+            <td>${actionCell(w)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6" class="text-muted">No withdrawals found in this status.</td></tr>';
     }
 
     window.approve = async (id) => {
+      if (!confirm('Have you manually transferred this payment to the user?')) return;
+      clearError();
       const token = await getToken();
-      const res = await fetch('/api/finance?action=approveWithdrawal', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
+      const res = await fetch('/api/finance?action=approveWithdrawal', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ withdrawal_id: id }) 
+      });
       const json = await res.json();
       if (!res.ok) { showError(json.error || 'Approve failed'); return; }
       load();
     };
 
     window.reject = async (id) => {
+      if (!confirm('Are you sure you want to reject this request? The funds will be refunded back to the user\'s wallet.')) return;
+      clearError();
       const token = await getToken();
-      const res = await fetch('/api/finance?action=rejectWithdrawal', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
+      const res = await fetch('/api/finance?action=rejectWithdrawal', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ withdrawal_id: id }) 
+      });
       const json = await res.json();
       if (!res.ok) { showError(json.error || 'Reject failed'); return; }
-      load();
-    };
-
-    window.sendPayout = async (id) => {
-      clearError();
-      try {
-        const token = await getToken();
-        const res = await fetch('/api/withdraw-payout', { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({ withdrawal_id: id }) });
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          showError(json.error || `Payout request failed (${res.status})`);
-        }
-      } catch (err) {
-        console.error('sendPayout failed:', err);
-        showError(`Could not reach the payout endpoint: ${err.message}`);
-      }
       load();
     };
 
