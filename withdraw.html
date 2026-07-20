@@ -1,159 +1,354 @@
 <!DOCTYPE html>
-<html lang="en" class="dark-theme">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Manual Withdrawals – Admin</title>
-  <link rel="stylesheet" href="../assets/css/style.css">
+  <title>Withdraw – DTL Stocks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
-  <div class="flex">
-    <aside class="sidebar">
-      <ul class="sidebar-nav">
-        <li><a href="index.html">Dashboard</a></li>
-        <li><a href="users.html">Users</a></li>
-        <li><a href="deposits.html">Deposits</a></li>
-        <li><a href="withdrawals.html" class="active">Withdrawals</a></li>
-        <li><a href="products.html">Products</a></li>
-        <li><a href="support.html">Support</a></li>
-        <li><a href="kyc.html">KYC</a></li>
-        <li><a href="reports.html">Reports</a></li>
-        <li><a href="settings.html">Settings</a></li>
-        <li><a href="logs.html">Logs</a></li>
-      </ul>
-    </aside>
-    <main style="flex:1; padding:2rem;">
-      <h2>Manual Withdrawal Management</h2>
-      <p class="text-muted mb-2">Review pending requests, send the bank transfer manually, then click Approve to complete.</p>
+  <div id="header-container"></div>
 
-      <div class="flex gap-2 mb-2">
-        <select id="status-filter" class="form-select">
-          <option value="pending">Pending</option>
-          <option value="approved">Approved (Paid)</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <button class="btn btn-primary" id="load-btn">Load</button>
+  <div class="section dashboard-page" style="max-width:640px;">
+
+    <div class="page-header">
+      <div class="dashboard-eyebrow">Wallet</div>
+      <h2>Withdraw funds</h2>
+      <p class="text-muted" style="margin-bottom:0;">Send money from your wallet to your bank account.</p>
+    </div>
+
+    <div id="kyc-banner-wrap" class="mb-2"></div>
+
+    <!-- Balance summary -->
+    <div class="balance-card animate-fade" id="balance-card" style="display:none;">
+      <div class="balance-card-top">
+        <span class="balance-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+          Available to withdraw
+        </span>
+        <div class="balance-amount currency-ngn" id="available-balance">0</div>
+      </div>
+      <div class="balance-sub-grid">
+        <div class="balance-sub">
+          <span class="balance-sub-label">Minimum request</span>
+          <span class="balance-sub-value currency-ngn">1,000</span>
+        </div>
+        <div class="balance-sub">
+          <span class="balance-sub-label">Payout method</span>
+          <span class="balance-sub-value">Bank transfer</span>
+        </div>
+        <div class="balance-sub">
+          <span class="balance-sub-label">Typical payout time</span>
+          <span class="balance-sub-value">Within 24 hrs</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
+
+    <!-- Withdrawal form -->
+    <form id="withdraw-form" class="card form-card">
+
+      <div class="form-section-label">Amount</div>
+      <div class="form-group amount-field">
+        <span class="amount-prefix">₦</span>
+        <input type="number" id="amount" class="form-input" required min="1000" placeholder="0.00">
+      </div>
+      <div class="quick-chips">
+        <button type="button" class="quick-chip" data-pct="25">25%</button>
+        <button type="button" class="quick-chip" data-pct="50">50%</button>
+        <button type="button" class="quick-chip" data-pct="75">75%</button>
+        <button type="button" class="quick-chip" data-pct="100">Max</button>
+      </div>
+      <div class="field-hint">Minimum ₦1,000 per request.</div>
+
+      <div class="form-section-label">Payout account</div>
+
+      <div class="form-group">
+        <label class="form-label">Bank</label>
+        <div class="combo" id="bank-combo">
+          <button type="button" class="combo-toggle form-input" id="combo-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="combo-toggle-left">
+              <span class="combo-toggle-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6"/></svg>
+              </span>
+              <span class="combo-toggle-label is-placeholder" id="combo-toggle-label">Select your bank</span>
+            </span>
+            <svg class="combo-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="combo-panel" id="combo-panel" hidden>
+            <input type="text" class="combo-search" id="combo-search" placeholder="Search bank name…">
+            <div class="combo-list" id="combo-list"></div>
+          </div>
+        </div>
       </div>
 
-      <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
+      <div class="form-group">
+        <label class="form-label">Account Number</label>
+        <input id="account_number" class="form-input" required maxlength="10" inputmode="numeric" placeholder="0123456789">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Account Name</label>
+        <input id="account_name" class="form-input" required placeholder="As it appears on your bank account">
+      </div>
 
-      <table id="withdrawals-table" class="table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Amount</th>
-            <th>Bank Details</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </main>
+      <div class="summary-card" id="summary-card" style="display:none;">
+        <div class="summary-row"><span>You're withdrawing</span><span class="currency-ngn" id="summary-amount">0</span></div>
+        <div class="summary-row"><span>To</span><span id="summary-account">—</span></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" id="withdraw-submit-btn" style="margin-top:1.5rem;">
+        Request Withdrawal
+      </button>
+      <div class="submit-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Requests are reviewed and paid out manually by our team. Funds leave your wallet balance immediately once submitted.</span>
+      </div>
+    </form>
+
+    <!-- History -->
+    <h3 class="mt-3 mb-2" style="font-family:var(--font-display);">Withdrawal History</h3>
+    <div class="card" id="history">
+      <div class="history-empty"><span class="text-muted">Loading…</span></div>
+    </div>
+
   </div>
 
+  <div id="footer-container"></div>
+  <script src="/assets/js/components.js"></script>
+  <script src="/assets/js/bank-list.js"></script>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
     const supabase = createClient(
       'https://jytmnukzvxirnafukbck.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
     );
+    window.supabase = supabase;
 
-    async function getToken() { 
-      return (await supabase.auth.getSession()).data.session?.access_token; 
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) window.location.href = 'login.html';
+      return user;
     }
 
     function showError(msg) {
       const el = document.getElementById('error-alert');
       el.textContent = msg;
       el.style.display = 'block';
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     function clearError() {
       document.getElementById('error-alert').style.display = 'none';
     }
 
-    function actionCell(w) {
-      if (w.status === 'pending') {
-        return `
-          <button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Mark as Paid</button> 
-          <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject & Refund</button>
-        `;
+    // ---------- Bank combobox ----------
+    let selectedBank = null; // { code, name }
+    const comboEl = document.getElementById('bank-combo');
+    const toggleEl = document.getElementById('combo-toggle');
+    const toggleLabelEl = document.getElementById('combo-toggle-label');
+    const panelEl = document.getElementById('combo-panel');
+    const searchEl = document.getElementById('combo-search');
+    const listEl = document.getElementById('combo-list');
+
+    function renderBankOptions(filter) {
+      const banks = window.NGN_BANKS || [];
+      const q = (filter || '').trim().toLowerCase();
+      const filtered = q ? banks.filter(b => b.name.toLowerCase().includes(q)) : banks;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="combo-empty">No bank matches your search.</div>';
+        return;
       }
-      if (w.status === 'approved') return '<span class="badge badge-success">Completed</span>';
-      if (w.status === 'rejected') return '<span class="badge badge-danger">Refunded</span>';
-      return '';
+      listEl.innerHTML = filtered.map(b => `
+        <button type="button" class="combo-option${selectedBank?.code === b.code ? ' is-selected' : ''}" data-code="${b.code}" data-name="${b.name}">
+          ${b.name}
+        </button>
+      `).join('');
     }
 
-    async function load() {
-      clearError();
-      const status = document.getElementById('status-filter').value;
-      const token = await getToken();
-
-      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      });
-      const data = await res.json();
-
-      if (!res.ok) { 
-        showError(data.error || 'Failed to load withdrawals'); 
-        return; 
-      }
-
-      const tbody = document.querySelector('#withdrawals-table tbody');
-      const rows = data.withdrawals || [];
-      tbody.innerHTML = rows.map(w => {
-        const bank = w.bank_details || {};
-        return `
-          <tr>
-            <td>
-              <strong>${w.profiles?.full_name || 'No Name'}</strong><br>
-              <small class="text-muted">${w.profiles?.email || w.user_id?.slice(0,8)}</small>
-            </td>
-            <td><strong>₦${Number(w.amount).toLocaleString()}</strong></td>
-            <td>
-              <strong>${bank.bank_name || 'N/A'}</strong><br>
-              <code>${bank.account_number || ''}</code> (${bank.account_name || ''})
-            </td>
-            <td><span class="badge badge-${w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'danger' : 'warning'}">${w.status}</span></td>
-            <td><small>${new Date(w.created_at).toLocaleDateString()}</small></td>
-            <td>${actionCell(w)}</td>
-          </tr>
-        `;
-      }).join('') || '<tr><td colspan="6" class="text-muted">No withdrawals found in this status.</td></tr>';
+    function openCombo() {
+      comboEl.classList.add('is-open');
+      panelEl.hidden = false;
+      toggleEl.setAttribute('aria-expanded', 'true');
+      renderBankOptions('');
+      searchEl.value = '';
+      setTimeout(() => searchEl.focus(), 0);
+    }
+    function closeCombo() {
+      comboEl.classList.remove('is-open');
+      panelEl.hidden = true;
+      toggleEl.setAttribute('aria-expanded', 'false');
     }
 
-    window.approve = async (id) => {
-      if (!confirm('Have you manually transferred this payment to the user?')) return;
-      clearError();
-      const token = await getToken();
-      const res = await fetch('/api/admin?action=approveWithdrawal', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
-        body: JSON.stringify({ withdrawal_id: id }) 
+    toggleEl.addEventListener('click', () => {
+      panelEl.hidden ? openCombo() : closeCombo();
+    });
+    searchEl.addEventListener('input', () => renderBankOptions(searchEl.value));
+    listEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.combo-option');
+      if (!btn) return;
+      selectedBank = { code: btn.dataset.code, name: btn.dataset.name };
+      toggleLabelEl.textContent = btn.dataset.name;
+      toggleLabelEl.classList.remove('is-placeholder');
+      closeCombo();
+      updateSummary();
+    });
+    document.addEventListener('click', (e) => {
+      if (!comboEl.contains(e.target)) closeCombo();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCombo();
+    });
+
+    // ---------- Quick amount chips ----------
+    let currentBalance = 0;
+    document.querySelectorAll('.quick-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const pct = Number(chip.dataset.pct);
+        const amt = Math.floor((currentBalance * pct) / 100);
+        document.getElementById('amount').value = amt > 0 ? amt : '';
+        document.querySelectorAll('.quick-chip').forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        updateSummary();
+      });
+    });
+    document.getElementById('amount').addEventListener('input', () => {
+      document.querySelectorAll('.quick-chip').forEach(c => c.classList.remove('is-active'));
+      updateSummary();
+    });
+    document.getElementById('account_number').addEventListener('input', updateSummary);
+    document.getElementById('account_name').addEventListener('input', updateSummary);
+
+    function updateSummary() {
+      const amount = +document.getElementById('amount').value || 0;
+      const accountNumber = document.getElementById('account_number').value.trim();
+      const accountName = document.getElementById('account_name').value.trim();
+      const summaryCard = document.getElementById('summary-card');
+
+      if (amount > 0 && selectedBank && accountNumber && accountName) {
+        document.getElementById('summary-amount').textContent = amount.toLocaleString();
+        document.getElementById('summary-account').textContent = `${accountName} · ${selectedBank.name} · ${accountNumber}`;
+        summaryCard.style.display = 'block';
+      } else {
+        summaryCard.style.display = 'none';
+      }
+    }
+
+    // ---------- Balance + KYC gate ----------
+    async function loadBalanceAndGate(user) {
+      const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
+      currentBalance = wallet?.balance || 0;
+      document.getElementById('available-balance').textContent = currentBalance.toLocaleString();
+      document.getElementById('balance-card').style.display = 'block';
+
+      const { data: profile } = await supabase.from('profiles').select('kyc_status').eq('id', user.id).single();
+      const wrap = document.getElementById('kyc-banner-wrap');
+      const status = profile?.kyc_status;
+
+      if (status === 'pending') {
+        wrap.innerHTML = `<div class="alert alert-info kyc-banner"><span>Your documents are under review.</span></div>`;
+      } else if (status === 'rejected') {
+        wrap.innerHTML = `<div class="alert alert-danger kyc-banner"><span>Your last KYC submission was rejected.</span><a href="/kyc.html" class="btn btn-sm btn-outline">Resubmit</a></div>`;
+        document.getElementById('withdraw-form').style.display = 'none';
+      } else if (status !== 'approved') {
+        wrap.innerHTML = `<div class="alert alert-danger kyc-banner"><span>Not verified — withdrawals are locked.</span><a href="/kyc.html" class="btn btn-sm btn-primary">Verify Now</a></div>`;
+        document.getElementById('withdraw-form').style.display = 'none';
+      }
+    }
+
+    // ---------- Submit ----------
+    async function callFinanceApi(action, body) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/finance?action=${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify(body || {}),
       });
       const json = await res.json();
-      if (!res.ok) { showError(json.error || 'Approve failed'); return; }
-      load();
-    };
+      if (!res.ok) throw new Error(json.error || 'Request failed');
+      return json;
+    }
 
-    window.reject = async (id) => {
-      if (!confirm('Are you sure you want to reject this request? The funds will be refunded back to the user\'s wallet.')) return;
+    document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
       clearError();
-      const token = await getToken();
-      const res = await fetch('/api/admin?action=rejectWithdrawal', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
-        body: JSON.stringify({ withdrawal_id: id }) 
-      });
-      const json = await res.json();
-      if (!res.ok) { showError(json.error || 'Reject failed'); return; }
-      load();
-    };
 
-    document.getElementById('load-btn').addEventListener('click', load);
-    load();
+      const amount = +document.getElementById('amount').value;
+      const account_number = document.getElementById('account_number').value.trim();
+      const account_name = document.getElementById('account_name').value.trim();
+
+      if (!selectedBank) return showError('Please select your bank.');
+      if (amount > currentBalance) return showError('That amount is more than your available balance.');
+
+      const btn = document.getElementById('withdraw-submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+
+      try {
+        await callFinanceApi('createWithdrawal', {
+          amount,
+          bank_code: selectedBank.code,
+          bank_name: selectedBank.name,
+          account_number,
+          account_name
+        });
+        alert('Withdrawal request submitted!');
+        location.reload();
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Request Withdrawal';
+      }
+    });
+
+    // ---------- History ----------
+    function statusBadge(status) {
+      if (status === 'approved') return '<span class="badge badge-success">Paid</span>';
+      if (status === 'rejected') return '<span class="badge badge-danger">Rejected</span>';
+      return '<span class="badge badge-warning">Pending</span>';
+    }
+
+    async function loadHistory(user) {
+      const { data } = await supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      const container = document.getElementById('history');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = `
+          <div class="history-empty">
+            <span class="history-empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </span>
+            <strong>No withdrawals yet</strong>
+            <span>Your requests will show up here once you submit one.</span>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = data.map(w => `
+        <div class="txn-row">
+          <span class="txn-icon" style="background:#EFEDF5;color:var(--clr-purple-ink);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </span>
+          <div class="txn-body">
+            <div class="txn-title currency-ngn">${Number(w.amount).toLocaleString()}</div>
+            <div class="txn-date">${w.bank_details?.bank_name || ''} · ${w.bank_details?.account_number || ''} · ${new Date(w.created_at).toLocaleDateString()}</div>
+          </div>
+          ${statusBadge(w.status)}
+        </div>
+      `).join('');
+    }
+
+    checkAuth().then(async (user) => {
+      if (!user) return;
+      await loadBalanceAndGate(user);
+      await loadHistory(user);
+    });
   </script>
 </body>
 </html>
