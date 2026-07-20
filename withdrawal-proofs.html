@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Withdrawal Proofs – Community</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .proof-card {
+    background: var(--clr-card-bg, #fff);
+    border: 1px solid var(--clr-border, #e9ecef);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .proof-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .proof-user {
+    font-weight: 600;
+  }
+  .proof-img {
+    width: 100%;
+    max-height: 380px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin: 0.75rem 0;
+    border: 1px solid #eee;
+  }
+  .comment-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--clr-border, #eee);
+  }
+  .comment-item {
+    background: #f8f9fa;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+  .comment-user {
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+</style>
+</head>
+<body>
+<div id="header-container"></div>
+
+<div class="section dashboard-page" style="max-width:600px;">
+  <div class="page-header">
+    <h2>Withdrawal Proofs Community</h2>
+    <p class="text-muted" style="margin-bottom:0;">Share your withdrawal payment screenshots with the community and celebrate together!</p>
+  </div>
+
+  <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
+  <div id="success-alert" class="alert alert-success" style="display:none;"></div>
+
+  <!-- Upload Form Card -->
+  <div class="card mb-4">
+    <h3 style="margin-top:0;" class="mb-2">Post Your Withdrawal Proof</h3>
+    <form id="upload-proof-form">
+      <div class="form-group mb-2">
+        <label class="form-label">Withdrawal Amount (₦)</label>
+        <input type="number" id="proof-amount" class="form-input" placeholder="e.g. 25000" required>
+      </div>
+
+      <div class="form-group mb-2">
+        <label class="form-label">Payment Screenshot</label>
+        <input type="file" id="proof-file" class="form-input" accept="image/*" required>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Caption / Message (Optional)</label>
+        <input type="text" id="proof-caption" class="form-input" placeholder="e.g. Paid smoothly into GTBank! Thanks DTL Stocks.">
+      </div>
+
+      <button type="submit" id="submit-proof-btn" class="btn btn-primary btn-block">Upload & Share Proof</button>
+    </form>
+  </div>
+
+  <!-- Proof Feed Container -->
+  <h3 class="mb-3">Recent Community Proofs</h3>
+  <div id="proofs-feed">
+    <div class="card text-center text-muted">Loading community proofs…</div>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+
+window.supabase = supabase;
+
+function showError(msg) {
+  const box = document.getElementById('error-alert');
+  box.textContent = msg;
+  box.style.display = 'block';
+  document.getElementById('success-alert').style.display = 'none';
+}
+
+function showSuccess(msg) {
+  const box = document.getElementById('success-alert');
+  box.textContent = msg;
+  box.style.display = 'block';
+  document.getElementById('error-alert').style.display = 'none';
+}
+
+// Upload Proof Logic
+document.getElementById('upload-proof-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return (window.location.href = 'login.html');
+
+  const amount = document.getElementById('proof-amount').value;
+  const caption = document.getElementById('proof-caption').value;
+  const file = document.getElementById('proof-file').files[0];
+
+  if (!file) {
+    showError('Please select a payment screenshot image.');
+    return;
+  }
+
+  const submitBtn = document.getElementById('submit-proof-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Uploading proof…';
+
+  try {
+    // 1. Upload to storage bucket
+    const fileExt = file.name.split('.').pop();
+    const filePath = `withdrawal_proofs/${session.user.id}_${Date.now()}.${fileExt}`;
+
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('proofs')
+      .upload(filePath, file);
+
+    if (uploadError) throw new Error('Upload failed: ' + uploadError.message);
+
+    // 2. Submit record to API
+    const res = await fetch('/api/finance?action=createWithdrawalProof', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        amount,
+        caption,
+        image_url: uploadData.path
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit proof');
+
+    showSuccess('Your withdrawal proof has been posted!');
+    document.getElementById('upload-proof-form').reset();
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Upload & Share Proof';
+    loadProofs();
+  } catch (err) {
+    showError(err.message || 'Error uploading proof.');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Upload & Share Proof';
+  }
+});
+
+// Load Feed Logic
+async function loadProofs() {
+  const container = document.getElementById('proofs-feed');
+  try {
+    const res = await fetch('/api/finance?action=listWithdrawalProofs');
+    const proofs = await res.json();
+
+    if (!proofs || proofs.length === 0) {
+      container.innerHTML = '<div class="card text-muted text-center">No community proofs uploaded yet. Be the first!</div>';
+      return;
+    }
+
+    container.innerHTML = proofs.map(p => {
+      const userName = p.profiles?.full_name || p.profiles?.email?.split('@')[0] || 'Community Member';
+      const comments = p.proof_comments || [];
+
+      return `
+        <div class="proof-card">
+          <div class="proof-header">
+            <span class="proof-user">👤 ${userName}</span>
+            <span class="badge badge-success">Received ₦${Number(p.amount).toLocaleString()}</span>
+          </div>
+
+          ${p.caption ? `<p style="margin-bottom:0.5rem;">${p.caption}</p>` : ''}
+          <a href="${p.display_url}" target="_blank">
+            <img src="${p.display_url}" class="proof-img" alt="Withdrawal Proof Screenshot">
+          </a>
+          <small class="text-muted">Posted on ${new Date(p.created_at).toLocaleDateString()}</small>
+
+          <!-- Comment Feed -->
+          <div class="comment-section">
+            <h5 style="margin-top:0;" class="mb-2">Comments (${comments.length})</h5>
+            <div id="comments-list-${p.id}">
+              ${comments.map(c => `
+                <div class="comment-item">
+                  <span class="comment-user">${c.profiles?.full_name || c.profiles?.email?.split('@')[0] || 'User'}:</span>
+                  <span>${c.comment}</span>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Add Comment Form -->
+            <div class="flex gap-1 mt-2">
+              <input type="text" id="comment-input-${p.id}" class="form-input" placeholder="Write a comment…" style="font-size:0.9rem;">
+              <button class="btn btn-sm btn-primary" onclick="submitComment('${p.id}')">Post</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="card text-danger">Failed to load community proofs.</div>';
+  }
+}
+
+// Global function to handle posting comments
+window.submitComment = async (proofId) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return (window.location.href = 'login.html');
+
+  const input = document.getElementById(`comment-input-${proofId}`);
+  const comment = input.value.trim();
+  if (!comment) return;
+
+  try {
+    const res = await fetch('/api/finance?action=addProofComment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ proof_id: proofId, comment })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to add comment');
+
+    input.value = '';
+    loadProofs();
+  } catch (err) {
+    alert(err.message || 'Error posting comment');
+  }
+};
+
+loadProofs();
+</script>
+</body>
+</html>
