@@ -3,7 +3,7 @@
  * Actions: stats, users, freezeUser, banUser, unbanUser, creditWallet, debitWallet,
  *          lockWithdrawals, openWithdrawals, maintenanceMode, settingsGet, settingsUpdate,
  *          broadcast, getAuditLogs, getActivityLogs, exportCSV, kycList, approveKYC, rejectKYC,
- *          withdrawalsList
+ *          withdrawalsList, deposits
  */
 import supabaseAdmin from '../lib/supabase.js';
 import { verifyAdmin } from '../lib/auth.js';
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
       case 'updateProduct': return updateProduct(req, res);
       case 'toggleProductLock': return toggleProductLock(req, res);
       case 'withdrawalsList': return withdrawalsList(req, res);
+      case 'deposits': return depositsList(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -168,7 +169,6 @@ async function settingsUpdate(req, res) {
 async function broadcast(req, res) {
   await verifyAdmin(req);
   const { title, body } = req.body;
-  // Notify all users (insert notification for each)
   const { data: users } = await supabaseAdmin.from('profiles').select('id');
   const notifications = users.map(u => ({ user_id: u.id, title, body }));
   await supabaseAdmin.from('notifications').insert(notifications);
@@ -196,7 +196,6 @@ async function exportCSV(req, res) {
   const { table } = req.query;
   if (!['transactions','deposits','withdrawals','investments','users'].includes(table)) return res.status(400).json({ error: 'Invalid table' });
   const { data } = await supabaseAdmin.from(table).select('*').limit(1000);
-  // Convert to CSV
   const csv = data.length ? [Object.keys(data[0]).join(','), ...data.map(row => Object.values(row).map(v => `"${v}"`).join(','))].join('\n') : '';
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=${table}.csv`);
@@ -209,11 +208,27 @@ async function getSetting(key) {
 }
 
 // ============================================================
+// Deposits review (used by admin/deposits.html)
+// ============================================================
+
+async function depositsList(req, res) {
+  await verifyAdmin(req);
+  const { status } = req.query;
+
+  let query = supabaseAdmin
+    .from('deposits')
+    .select('*, profiles(email, full_name)')
+    .order('created_at', { ascending: false });
+
+  if (status) query = query.eq('status', status);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+// ============================================================
 // Withdrawals review (used by admin/withdrawals.html)
-// Separate from api/finance.js's listWithdrawals, which is scoped to
-// the calling user only (eq('user_id', user.id)) — admins need every
-// user's withdrawals, filterable by status, so this is its own action
-// on the admin-only, service_role-backed endpoint.
 // ============================================================
 
 async function withdrawalsList(req, res) {
@@ -234,10 +249,6 @@ async function withdrawalsList(req, res) {
 
 // ============================================================
 // KYC review actions (used by admin/kyc.html)
-// image_url on kyc_documents is a private storage PATH (e.g.
-// "<user_id>/selfie_169....jpg"), not a public URL — it must be resolved
-// to a short-lived signed URL here, server-side, using supabaseAdmin
-// (service_role), since the bucket has no public access.
 // ============================================================
 
 async function kycList(req, res) {
@@ -254,7 +265,7 @@ async function kycList(req, res) {
     docs.map(async (doc) => {
       const { data: signed } = await supabaseAdmin.storage
         .from('kyc')
-        .createSignedUrl(doc.image_url, 300); // 5 minutes
+        .createSignedUrl(doc.image_url, 300);
       return { ...doc, signedUrl: signed?.signedUrl || null };
     })
   );
@@ -280,10 +291,6 @@ async function approveKYC(req, res) {
     .eq('id', id);
   if (docErr) return res.status(500).json({ error: docErr.message });
 
-  // Only one doc type (selfie) is currently required, so approving it
-  // approves the user. If you later require id_front/id_back/address_proof
-  // too, check that ALL of the user's required doc types are approved
-  // before flipping profiles.kyc_status.
   const { error: profileErr } = await supabaseAdmin
     .from('profiles')
     .update({ kyc_status: 'approved', updated_at: new Date().toISOString() })
@@ -340,11 +347,7 @@ async function rejectKYC(req, res) {
 }
 
 // ============================================================
-// Gift code actions (used by admin/gift-codes.html)
-// gift_codes has RLS policy "deny_all_gift" (FOR ALL USING (false)),
-// which blocks direct client access entirely — by design, so gift code
-// creation/management can only happen here, server-side, with the
-// service_role client.
+// Gift code actions
 // ============================================================
 
 async function giftCodesList(req, res) {
@@ -376,7 +379,6 @@ async function createGiftCode(req, res) {
     .single();
 
   if (error) {
-    // unique_violation on the code column
     if (error.code === '23505') return res.status(409).json({ error: 'That code already exists' });
     return res.status(500).json({ error: error.message });
   }
@@ -406,10 +408,7 @@ async function toggleGiftCode(req, res) {
 }
 
 // ============================================================
-// Product management actions (used by admin/products.html)
-// products has RLS: a public read-only policy (is_locked = false) plus
-// deny_all for everything else — so writes must go through here with
-// supabaseAdmin (service_role), same pattern as gift codes.
+// Product management actions
 // ============================================================
 
 async function productsList(req, res) {
@@ -437,9 +436,6 @@ async function createProduct(req, res) {
   if (err) return res.status(400).json({ error: err });
 
   const { name, description, price, daily_income, duration_days, max_purchases } = req.body;
-  // daily_roi_percent is kept populated (informational) since the column
-  // is NOT NULL with a > 0 check — the app itself uses daily_income_amount
-  // directly for fixed-price packages like this one, not this percentage.
   const impliedPercent = (Number(daily_income) / Number(price)) * 100;
 
   const { data, error } = await supabaseAdmin
