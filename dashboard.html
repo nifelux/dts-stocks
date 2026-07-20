@@ -242,6 +242,7 @@
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
+      const STATUS_BADGE = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
       const txnHtml = txns?.map(t => {
         const cfg = TXN_ICONS[t.type] || TXN_ICONS.deposit;
         return `
@@ -251,7 +252,10 @@
             <div class="txn-title">${t.type.replace('_', ' ')}</div>
             <div class="txn-date">${new Date(t.created_at).toLocaleDateString()}</div>
           </div>
-          <div class="txn-amount ${cfg.in ? 'is-in' : 'is-out'}">${cfg.in ? '+' : '-'}₦${t.amount.toLocaleString()}</div>
+          <div style="text-align:right;">
+            <div class="txn-amount ${cfg.in ? 'is-in' : 'is-out'}">${cfg.in ? '+' : '-'}₦${t.amount.toLocaleString()}</div>
+            <span class="badge ${STATUS_BADGE[t.status] || ''}" style="margin-top:0.2rem;">${t.status}</span>
+          </div>
         </div>`;
       }).join('') || '<p class="text-muted">No transactions yet.</p>';
       document.getElementById('transactions-list').innerHTML = txnHtml;
