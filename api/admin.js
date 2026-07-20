@@ -115,11 +115,33 @@ async function approveWithdrawal(req, res) {
     return res.status(500).json({ error: 'Failed to update withdrawal status' });
   }
 
-  // 2. Mark Transaction Approved
-  await supabaseAdmin
+  // 2. Debit the wallet. Same defensive pattern as approveDeposit: if
+  // no matching transaction exists for some reason, insert one directly
+  // instead of silently updating zero rows.
+  const { data: existingTxn } = await supabaseAdmin
     .from('transactions')
-    .update({ status: 'approved' })
-    .eq('reference', `wd_${wd.id}`);
+    .select('id')
+    .eq('reference', `wd_${wd.id}`)
+    .maybeSingle();
+
+  if (existingTxn) {
+    await supabaseAdmin
+      .from('transactions')
+      .update({ status: 'approved' })
+      .eq('reference', `wd_${wd.id}`);
+  } else {
+    console.warn(`No transaction found for withdrawal ${wd.id} — creating one directly.`);
+    const { error: txnInsertErr } = await supabaseAdmin.from('transactions').insert({
+      user_id: wd.user_id,
+      type: 'withdrawal',
+      amount: wd.amount,
+      status: 'approved',
+      reference: `wd_${wd.id}`
+    });
+    if (txnInsertErr) {
+      return res.status(500).json({ error: `Withdrawal marked approved but wallet debit failed: ${txnInsertErr.message}` });
+    }
+  }
 
   // 3. Send Notification
   await sendTelegramMessage(
@@ -223,15 +245,37 @@ async function approveDeposit(req, res) {
     return res.status(500).json({ error: 'Failed to update deposit status' });
   }
 
-  // 2. Mark Transaction Approved — this update is what actually credits
-  // the wallet: trg_process_transaction fires on this status change and
-  // applies balance += amount for type='deposit'. Calling
-  // credit_wallet_balance directly afterward (as this used to) credited
-  // the wallet a second time for every approved deposit.
-  await supabaseAdmin
+  // 2. Credit the wallet. If a matching pending transaction already
+  // exists (the normal case), updating it to 'approved' is what fires
+  // trg_process_transaction. If none exists — e.g. this deposit was
+  // created by an older code path that never logged one — the UPDATE
+  // below would silently affect zero rows and nothing would be
+  // credited, with no error anywhere. Insert one directly in that case
+  // instead, which fires the trigger via INSERT.
+  const { data: existingTxn } = await supabaseAdmin
     .from('transactions')
-    .update({ status: 'approved' })
-    .eq('reference', `dp_${deposit.id}`);
+    .select('id')
+    .eq('reference', `dp_${deposit.id}`)
+    .maybeSingle();
+
+  if (existingTxn) {
+    await supabaseAdmin
+      .from('transactions')
+      .update({ status: 'approved' })
+      .eq('reference', `dp_${deposit.id}`);
+  } else {
+    console.warn(`No transaction found for deposit ${deposit.id} — creating one directly.`);
+    const { error: txnInsertErr } = await supabaseAdmin.from('transactions').insert({
+      user_id: deposit.user_id,
+      type: 'deposit',
+      amount: deposit.amount,
+      status: 'approved',
+      reference: `dp_${deposit.id}`
+    });
+    if (txnInsertErr) {
+      return res.status(500).json({ error: `Deposit marked approved but wallet credit failed: ${txnInsertErr.message}` });
+    }
+  }
 
   // 4. Send Notification
   await sendTelegramMessage(
@@ -294,3 +338,4 @@ async function rejectDeposit(req, res) {
 
   return res.status(200).json({ message: 'Deposit rejected successfully' });
 }
+  
