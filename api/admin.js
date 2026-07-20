@@ -195,6 +195,19 @@ async function rejectWithdrawal(req, res) {
     }
   }
 
+  // 3b. Record the reversal as its own transaction so it's visible in the
+  // user's history — previously only the original (now-rejected) withdrawal
+  // transaction existed, with nothing showing the refund actually happened.
+  await supabaseAdmin.from('transactions').insert({
+    user_id: wd.user_id,
+    type: 'withdrawal_reversal',
+    amount: Number(wd.amount),
+    status: 'approved',
+    reference: `wd_refund_${wd.id}`,
+    description: `Withdrawal request rejected — ₦${wd.amount} refunded to wallet`,
+    created_at: new Date()
+  });
+
   // 4. Send Notification
   await sendTelegramMessage(
     `❌ *Withdrawal Rejected & Refunded*\n` +
