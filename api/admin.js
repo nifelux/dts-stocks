@@ -1,9 +1,11 @@
 /**
  * Admin API – Comprehensive management actions
- * Actions: stats, users, freezeUser, banUser, unbanUser, creditWallet, debitWallet,
- *          lockWithdrawals, openWithdrawals, maintenanceMode, settingsGet, settingsUpdate,
- *          broadcast, getAuditLogs, getActivityLogs, exportCSV, kycList, approveKYC, rejectKYC,
- *          withdrawalsList, deposits
+ * Actions: stats, users, userDetail, freezeUser, unfreezeUser, banUser, unbanUser,
+ *          creditWallet, debitWallet, lockWithdrawals, openWithdrawals, maintenanceMode,
+ *          settingsGet, settingsUpdate, broadcast, auditLogs, activityLogs, exportCSV,
+ *          kycList, approveKYC, rejectKYC, giftCodesList, createGiftCode, toggleGiftCode,
+ *          productsList, createProduct, updateProduct, toggleProductLock,
+ *          deposits, approveDeposit, rejectDeposit, withdrawalsList, approveWithdrawal, rejectWithdrawal
  */
 import supabaseAdmin from '../lib/supabase.js';
 import { verifyAdmin } from '../lib/auth.js';
@@ -41,8 +43,12 @@ export default async function handler(req, res) {
       case 'createProduct': return createProduct(req, res);
       case 'updateProduct': return updateProduct(req, res);
       case 'toggleProductLock': return toggleProductLock(req, res);
-      case 'withdrawalsList': return withdrawalsList(req, res);
       case 'deposits': return depositsList(req, res);
+      case 'approveDeposit': return approveDeposit(req, res);
+      case 'rejectDeposit': return rejectDeposit(req, res);
+      case 'withdrawalsList': return withdrawalsList(req, res);
+      case 'approveWithdrawal': return approveWithdrawal(req, res);
+      case 'rejectWithdrawal': return rejectWithdrawal(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -52,37 +58,41 @@ export default async function handler(req, res) {
 
 async function getStats(req, res) {
   await verifyAdmin(req);
-  const [users, deposits, withdrawals, investments, transactions] = await Promise.all([
+  const [users, deposits, withdrawals, investments] = await Promise.all([
     supabaseAdmin.from('profiles').select('id', { count: 'exact' }),
-    supabaseAdmin.from('deposits').select('amount', { count: 'exact' }).eq('status', 'approved'),
-    supabaseAdmin.from('withdrawals').select('amount', { count: 'exact' }).eq('status', 'approved'),
-    supabaseAdmin.from('investments').select('amount', { count: 'exact' }),
-    supabaseAdmin.from('transactions').select('amount, type').eq('status', 'approved')
+    supabaseAdmin.from('deposits').select('amount').eq('status', 'approved'),
+    supabaseAdmin.from('withdrawals').select('amount').eq('status', 'approved'),
+    supabaseAdmin.from('investments').select('amount, status')
   ]);
-  const totalDeposits = deposits.data.reduce((sum, d) => sum + d.amount, 0);
-  const totalWithdrawals = withdrawals.data.reduce((sum, w) => sum + w.amount, 0);
+  const totalDeposits = (deposits.data || []).reduce((sum, d) => sum + Number(d.amount), 0);
+  const totalWithdrawals = (withdrawals.data || []).reduce((sum, w) => sum + Number(w.amount), 0);
+  const totalInvestments = (investments.data || []).reduce((sum, i) => sum + Number(i.amount), 0);
+  const activeInvestments = (investments.data || []).filter(i => i.status === 'active').length;
+
   return res.status(200).json({
-    totalUsers: users.count,
+    totalUsers: users.count || 0,
     totalDeposits,
     totalWithdrawals,
-    totalInvestments: investments.data.reduce((s, i) => s + i.amount, 0),
-    activeInvestments: investments.data.filter(i => i.status === 'active').length
+    totalInvestments,
+    activeInvestments
   });
 }
 
 async function getUsers(req, res) {
   await verifyAdmin(req);
   const { page = 0, limit = 20, search } = req.query;
-  let query = supabaseAdmin.from('profiles').select('*, wallets(balance)');
+  let query = supabaseAdmin.from('profiles').select('*, wallets(balance)', { count: 'exact' });
   if (search) query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
   const { data, error, count } = await query.range(page * limit, (page * limit) + limit - 1).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ data, count });
 }
 
 async function getUserDetail(req, res) {
   await verifyAdmin(req);
   const { id } = req.query;
-  const { data } = await supabaseAdmin.from('profiles').select('*, wallets(*)').eq('id', id).single();
+  const { data, error } = await supabaseAdmin.from('profiles').select('*, wallets(*)').eq('id', id).single();
+  if (error) return res.status(404).json({ error: 'User not found' });
   return res.status(200).json(data);
 }
 
@@ -114,24 +124,65 @@ async function unbanUser(req, res) {
   return res.status(200).json({ message: 'User unbanned' });
 }
 
+// FIXED: Updates wallets table balance when credited
 async function creditWallet(req, res) {
   await verifyAdmin(req);
   const { user_id, amount, note } = req.body;
+  const numAmount = Number(amount);
+  if (!numAmount || numAmount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
+  const currentBalance = wallet ? Number(wallet.balance) : 0;
+  const newBalance = currentBalance + numAmount;
+
+  const { error: walletErr } = await supabaseAdmin
+    .from('wallets')
+    .upsert({ user_id, balance: newBalance }, { onConflict: 'user_id' });
+
+  if (walletErr) return res.status(400).json({ error: walletErr.message });
+
   await supabaseAdmin.from('transactions').insert({
-    user_id, type: 'admin_credit', amount, status: 'approved', reference: `admin_credit_${Date.now()}`, meta: { note }
+    user_id,
+    type: 'admin_credit',
+    amount: numAmount,
+    status: 'approved',
+    reference: `admin_credit_${Date.now()}`,
+    meta: { note: note || 'Admin manual credit' }
   });
-  return res.status(200).json({ message: 'Wallet credited' });
+
+  return res.status(200).json({ message: 'Wallet credited successfully' });
 }
 
+// FIXED: Deducts balance from wallets table when debited
 async function debitWallet(req, res) {
   await verifyAdmin(req);
   const { user_id, amount, note } = req.body;
+  const numAmount = Number(amount);
+  if (!numAmount || numAmount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
   const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
-  if (wallet.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
+  if (!wallet || Number(wallet.balance) < numAmount) {
+    return res.status(400).json({ error: 'Insufficient user balance' });
+  }
+
+  const newBalance = Number(wallet.balance) - numAmount;
+  const { error: walletErr } = await supabaseAdmin
+    .from('wallets')
+    .update({ balance: newBalance })
+    .eq('user_id', user_id);
+
+  if (walletErr) return res.status(400).json({ error: walletErr.message });
+
   await supabaseAdmin.from('transactions').insert({
-    user_id, type: 'admin_debit', amount, status: 'approved', reference: `admin_debit_${Date.now()}`, meta: { note }
+    user_id,
+    type: 'admin_debit',
+    amount: numAmount,
+    status: 'approved',
+    reference: `admin_debit_${Date.now()}`,
+    meta: { note: note || 'Admin manual debit' }
   });
-  return res.status(200).json({ message: 'Wallet debited' });
+
+  return res.status(200).json({ message: 'Wallet debited successfully' });
 }
 
 async function lockWithdrawals(req, res) {
@@ -155,14 +206,16 @@ async function maintenanceMode(req, res) {
 
 async function settingsGet(req, res) {
   await verifyAdmin(req);
-  const { data } = await supabaseAdmin.from('settings').select('*');
+  const { data, error } = await supabaseAdmin.from('settings').select('*');
+  if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
 }
 
 async function settingsUpdate(req, res) {
   await verifyAdmin(req);
   const { key, value } = req.body;
-  await supabaseAdmin.from('settings').upsert({ key, value });
+  const { error } = await supabaseAdmin.from('settings').upsert({ key, value });
+  if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ message: 'Setting updated' });
 }
 
@@ -170,8 +223,8 @@ async function broadcast(req, res) {
   await verifyAdmin(req);
   const { title, body } = req.body;
   const { data: users } = await supabaseAdmin.from('profiles').select('id');
-  const notifications = users.map(u => ({ user_id: u.id, title, body }));
-  await supabaseAdmin.from('notifications').insert(notifications);
+  const notifications = (users || []).map(u => ({ user_id: u.id, title, body }));
+  if (notifications.length) await supabaseAdmin.from('notifications').insert(notifications);
   return res.status(200).json({ message: 'Broadcast sent' });
 }
 
@@ -196,7 +249,7 @@ async function exportCSV(req, res) {
   const { table } = req.query;
   if (!['transactions','deposits','withdrawals','investments','users'].includes(table)) return res.status(400).json({ error: 'Invalid table' });
   const { data } = await supabaseAdmin.from(table).select('*').limit(1000);
-  const csv = data.length ? [Object.keys(data[0]).join(','), ...data.map(row => Object.values(row).map(v => `"${v}"`).join(','))].join('\n') : '';
+  const csv = data?.length ? [Object.keys(data[0]).join(','), ...data.map(row => Object.values(row).map(v => `"${v}"`).join(','))].join('\n') : '';
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=${table}.csv`);
   return res.status(200).send(csv);
@@ -208,64 +261,127 @@ async function getSetting(key) {
 }
 
 // ============================================================
-// Deposits review (used by admin/deposits.html)
+// Deposits management
 // ============================================================
 
 async function depositsList(req, res) {
   await verifyAdmin(req);
   const { status } = req.query;
-
-  let query = supabaseAdmin
-    .from('deposits')
-    .select('*, profiles(email, full_name)')
-    .order('created_at', { ascending: false });
-
+  let query = supabaseAdmin.from('deposits').select('*, profiles(email, full_name)').order('created_at', { ascending: false });
   if (status) query = query.eq('status', status);
-
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
 }
 
+async function approveDeposit(req, res) {
+  await verifyAdmin(req);
+  const { deposit_id, admin_notes } = req.body;
+  const { data: deposit } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
+  if (!deposit || deposit.status !== 'pending') return res.status(400).json({ error: 'Deposit not found or already processed' });
+
+  // 1. Add funds to user wallet
+  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', deposit.user_id).single();
+  const currentBalance = wallet ? Number(wallet.balance) : 0;
+  const newBalance = currentBalance + Number(deposit.amount);
+
+  await supabaseAdmin.from('wallets').upsert({ user_id: deposit.user_id, balance: newBalance }, { onConflict: 'user_id' });
+
+  // 2. Mark deposit approved
+  await supabaseAdmin.from('deposits').update({ status: 'approved', admin_notes, updated_at: new Date() }).eq('id', deposit_id);
+
+  // 3. Log transaction
+  await supabaseAdmin.from('transactions').insert({
+    user_id: deposit.user_id,
+    type: 'deposit',
+    amount: deposit.amount,
+    status: 'approved',
+    reference: `dep_${deposit.id}`
+  });
+
+  await sendTelegramMessage(`✅ Deposit approved: ₦${deposit.amount} for user ${deposit.user_id}`);
+  return res.status(200).json({ message: 'Deposit approved' });
+}
+
+async function rejectDeposit(req, res) {
+  await verifyAdmin(req);
+  const { deposit_id, admin_notes } = req.body;
+  const { data: deposit } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
+  if (!deposit || deposit.status !== 'pending') return res.status(400).json({ error: 'Deposit not found or already processed' });
+
+  await supabaseAdmin.from('deposits').update({ status: 'rejected', admin_notes, updated_at: new Date() }).eq('id', deposit_id);
+  await sendTelegramMessage(`❌ Deposit rejected: ${deposit_id}`);
+  return res.status(200).json({ message: 'Deposit rejected' });
+}
+
 // ============================================================
-// Withdrawals review (used by admin/withdrawals.html)
+// Withdrawals management
 // ============================================================
 
 async function withdrawalsList(req, res) {
   await verifyAdmin(req);
   const { status } = req.query;
-
-  let query = supabaseAdmin
-    .from('withdrawals')
-    .select('*, profiles(email, full_name)')
-    .order('created_at', { ascending: false });
-
+  let query = supabaseAdmin.from('withdrawals').select('*, profiles(email, full_name)').order('created_at', { ascending: false });
   if (status) query = query.eq('status', status);
-
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
 }
 
+async function approveWithdrawal(req, res) {
+  await verifyAdmin(req);
+  const { withdrawal_id, admin_notes } = req.body;
+  const { data: wd } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
+  if (!wd || wd.status !== 'pending') return res.status(400).json({ error: 'Withdrawal not found or already processed' });
+
+  // Mark approved (Funds were already deducted when requested)
+  await supabaseAdmin.from('withdrawals').update({ status: 'approved', admin_notes, updated_at: new Date() }).eq('id', withdrawal_id);
+
+  // Log transaction
+  await supabaseAdmin.from('transactions').insert({
+    user_id: wd.user_id,
+    type: 'withdrawal',
+    amount: wd.amount,
+    status: 'approved',
+    reference: `wd_${wd.id}`
+  });
+
+  await sendTelegramMessage(`✅ Withdrawal approved: ₦${wd.amount} to ${wd.bank_details?.account_name}`);
+  return res.status(200).json({ message: 'Withdrawal approved' });
+}
+
+async function rejectWithdrawal(req, res) {
+  await verifyAdmin(req);
+  const { withdrawal_id, admin_notes } = req.body;
+  const { data: wd } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
+  if (!wd || wd.status !== 'pending') return res.status(400).json({ error: 'Withdrawal not found or already processed' });
+
+  // 1. Mark rejected
+  await supabaseAdmin.from('withdrawals').update({ status: 'rejected', admin_notes, updated_at: new Date() }).eq('id', withdrawal_id);
+
+  // 2. Refund money back to user wallet
+  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', wd.user_id).single();
+  if (wallet) {
+    const refundedBalance = Number(wallet.balance) + Number(wd.amount);
+    await supabaseAdmin.from('wallets').update({ balance: refundedBalance }).eq('user_id', wd.user_id);
+  }
+
+  await sendTelegramMessage(`❌ Withdrawal rejected and refunded: ${withdrawal_id}`);
+  return res.status(200).json({ message: 'Withdrawal rejected and refunded' });
+}
+
 // ============================================================
-// KYC review actions (used by admin/kyc.html)
+// KYC review actions
 // ============================================================
 
 async function kycList(req, res) {
   await verifyAdmin(req);
-
-  const { data: docs, error } = await supabaseAdmin
-    .from('kyc_documents')
-    .select('*, profiles(email)')
-    .order('submitted_at', { ascending: false });
-
+  const { data: docs, error } = await supabaseAdmin.from('kyc_documents').select('*, profiles(email)').order('submitted_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
 
   const withSignedUrls = await Promise.all(
-    docs.map(async (doc) => {
-      const { data: signed } = await supabaseAdmin.storage
-        .from('kyc')
-        .createSignedUrl(doc.image_url, 300);
+    (docs || []).map(async (doc) => {
+      const { data: signed } = await supabaseAdmin.storage.from('kyc').createSignedUrl(doc.image_url, 300);
       return { ...doc, signedUrl: signed?.signedUrl || null };
     })
   );
@@ -278,32 +394,13 @@ async function approveKYC(req, res) {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Missing id' });
 
-  const { data: doc, error: fetchErr } = await supabaseAdmin
-    .from('kyc_documents')
-    .select('user_id')
-    .eq('id', id)
-    .single();
+  const { data: doc, error: fetchErr } = await supabaseAdmin.from('kyc_documents').select('user_id').eq('id', id).single();
   if (fetchErr || !doc) return res.status(404).json({ error: 'Document not found' });
 
-  const { error: docErr } = await supabaseAdmin
-    .from('kyc_documents')
-    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
-    .eq('id', id);
-  if (docErr) return res.status(500).json({ error: docErr.message });
+  await supabaseAdmin.from('kyc_documents').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', id);
+  await supabaseAdmin.from('profiles').update({ kyc_status: 'approved', updated_at: new Date().toISOString() }).eq('id', doc.user_id);
 
-  const { error: profileErr } = await supabaseAdmin
-    .from('profiles')
-    .update({ kyc_status: 'approved', updated_at: new Date().toISOString() })
-    .eq('id', doc.user_id);
-  if (profileErr) return res.status(500).json({ error: profileErr.message });
-
-  await supabaseAdmin.from('audit_logs').insert({
-    admin_id: admin?.id ?? null,
-    action: 'kyc_approved',
-    table_name: 'kyc_documents',
-    record_id: id
-  });
-
+  await supabaseAdmin.from('audit_logs').insert({ admin_id: admin?.id ?? null, action: 'kyc_approved', table_name: 'kyc_documents', record_id: id });
   return res.status(200).json({ message: 'KYC approved' });
 }
 
@@ -312,37 +409,13 @@ async function rejectKYC(req, res) {
   const { id, reason } = req.body;
   if (!id) return res.status(400).json({ error: 'Missing id' });
 
-  const { data: doc, error: fetchErr } = await supabaseAdmin
-    .from('kyc_documents')
-    .select('user_id')
-    .eq('id', id)
-    .single();
+  const { data: doc, error: fetchErr } = await supabaseAdmin.from('kyc_documents').select('user_id').eq('id', id).single();
   if (fetchErr || !doc) return res.status(404).json({ error: 'Document not found' });
 
-  const { error: docErr } = await supabaseAdmin
-    .from('kyc_documents')
-    .update({
-      status: 'rejected',
-      admin_notes: reason || null,
-      reviewed_at: new Date().toISOString()
-    })
-    .eq('id', id);
-  if (docErr) return res.status(500).json({ error: docErr.message });
+  await supabaseAdmin.from('kyc_documents').update({ status: 'rejected', admin_notes: reason || null, reviewed_at: new Date().toISOString() }).eq('id', id);
+  await supabaseAdmin.from('profiles').update({ kyc_status: 'rejected', updated_at: new Date().toISOString() }).eq('id', doc.user_id);
 
-  const { error: profileErr } = await supabaseAdmin
-    .from('profiles')
-    .update({ kyc_status: 'rejected', updated_at: new Date().toISOString() })
-    .eq('id', doc.user_id);
-  if (profileErr) return res.status(500).json({ error: profileErr.message });
-
-  await supabaseAdmin.from('audit_logs').insert({
-    admin_id: admin?.id ?? null,
-    action: 'kyc_rejected',
-    table_name: 'kyc_documents',
-    record_id: id,
-    new_values: { reason: reason || null }
-  });
-
+  await supabaseAdmin.from('audit_logs').insert({ admin_id: admin?.id ?? null, action: 'kyc_rejected', table_name: 'kyc_documents', record_id: id, new_values: { reason: reason || null } });
   return res.status(200).json({ message: 'KYC rejected' });
 }
 
@@ -352,10 +425,7 @@ async function rejectKYC(req, res) {
 
 async function giftCodesList(req, res) {
   await verifyAdmin(req);
-  const { data, error } = await supabaseAdmin
-    .from('gift_codes')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabaseAdmin.from('gift_codes').select('*').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
 }
@@ -367,16 +437,12 @@ async function createGiftCode(req, res) {
   if (!code || !String(code).trim()) return res.status(400).json({ error: 'Code is required' });
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
 
-  const { data, error } = await supabaseAdmin
-    .from('gift_codes')
-    .insert({
-      code: String(code).trim().toUpperCase(),
-      amount: Number(amount),
-      max_uses: max_uses ? Number(max_uses) : 1,
-      created_by: admin.id
-    })
-    .select()
-    .single();
+  const { data, error } = await supabaseAdmin.from('gift_codes').insert({
+    code: String(code).trim().toUpperCase(),
+    amount: Number(amount),
+    max_uses: max_uses ? Number(max_uses) : 1,
+    created_by: admin.id
+  }).select().single();
 
   if (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'That code already exists' });
@@ -391,17 +457,10 @@ async function toggleGiftCode(req, res) {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Missing id' });
 
-  const { data: existing, error: fetchErr } = await supabaseAdmin
-    .from('gift_codes')
-    .select('is_active')
-    .eq('id', id)
-    .single();
-  if (fetchErr || !existing) return res.status(404).json({ error: 'Gift code not found' });
+  const { data: existing } = await supabaseAdmin.from('gift_codes').select('is_active').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Gift code not found' });
 
-  const { error } = await supabaseAdmin
-    .from('gift_codes')
-    .update({ is_active: !existing.is_active })
-    .eq('id', id);
+  const { error } = await supabaseAdmin.from('gift_codes').update({ is_active: !existing.is_active }).eq('id', id);
   if (error) return res.status(500).json({ error: error.message });
 
   return res.status(200).json({ is_active: !existing.is_active });
@@ -413,10 +472,7 @@ async function toggleGiftCode(req, res) {
 
 async function productsList(req, res) {
   await verifyAdmin(req);
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabaseAdmin.from('products').select('*').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
 }
@@ -438,21 +494,17 @@ async function createProduct(req, res) {
   const { name, description, price, daily_income, duration_days, max_purchases } = req.body;
   const impliedPercent = (Number(daily_income) / Number(price)) * 100;
 
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .insert({
-      name: String(name).trim(),
-      description: description || null,
-      min_invest: Number(price),
-      max_invest: Number(price),
-      daily_roi_percent: Number(impliedPercent.toFixed(2)),
-      daily_income_amount: Number(daily_income),
-      duration_days: Number(duration_days),
-      max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
-      is_locked: false
-    })
-    .select()
-    .single();
+  const { data, error } = await supabaseAdmin.from('products').insert({
+    name: String(name).trim(),
+    description: description || null,
+    min_invest: Number(price),
+    max_invest: Number(price),
+    daily_roi_percent: Number(impliedPercent.toFixed(2)),
+    daily_income_amount: Number(daily_income),
+    duration_days: Number(duration_days),
+    max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
+    is_locked: false
+  }).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data);
@@ -468,20 +520,17 @@ async function updateProduct(req, res) {
   const { name, description, price, daily_income, duration_days, max_purchases } = req.body;
   const impliedPercent = (Number(daily_income) / Number(price)) * 100;
 
-  const { error } = await supabaseAdmin
-    .from('products')
-    .update({
-      name: String(name).trim(),
-      description: description || null,
-      min_invest: Number(price),
-      max_invest: Number(price),
-      daily_roi_percent: Number(impliedPercent.toFixed(2)),
-      daily_income_amount: Number(daily_income),
-      duration_days: Number(duration_days),
-      max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id);
+  const { error } = await supabaseAdmin.from('products').update({
+    name: String(name).trim(),
+    description: description || null,
+    min_invest: Number(price),
+    max_invest: Number(price),
+    daily_roi_percent: Number(impliedPercent.toFixed(2)),
+    daily_income_amount: Number(daily_income),
+    duration_days: Number(duration_days),
+    max_purchases_per_user: max_purchases ? Number(max_purchases) : null,
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ message: 'Product updated' });
@@ -492,15 +541,14 @@ async function toggleProductLock(req, res) {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Missing id' });
 
-  const { data: existing, error: fetchErr } = await supabaseAdmin
-    .from('products').select('is_locked').eq('id', id).single();
-  if (fetchErr || !existing) return res.status(404).json({ error: 'Product not found' });
+  const { data: existing } = await supabaseAdmin.from('products').select('is_locked').eq('id', id).single();
+  if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-  const { error } = await supabaseAdmin
-    .from('products')
-    .update({ is_locked: !existing.is_locked, updated_at: new Date().toISOString() })
-    .eq('id', id);
+  const { error } = await supabaseAdmin.from('products').update({
+    is_locked: !existing.is_locked,
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+
   if (error) return res.status(500).json({ error: error.message });
-
   return res.status(200).json({ is_locked: !existing.is_locked });
 }
