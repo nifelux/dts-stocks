@@ -1,54 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-theme">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Withdraw – DTL Stocks</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <title>Manual Withdrawals – Admin</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div id="header-container"></div>
+  <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
+  <div class="flex">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="deposits.html">Deposits</a></li>
+        <li><a href="withdrawals.html" class="active">Withdrawals</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="kyc.html">KYC</a></li>
+        <li><a href="reports.html">Reports</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logs.html">Logs</a></li>
+      </ul>
+    </aside>
+    <main style="flex:1; padding:2rem;">
+      <h2>Manual Withdrawal Management</h2>
+      <p class="text-muted mb-2">Review pending requests, send the bank transfer manually, then click Approve to complete.</p>
 
-  <div class="section" style="max-width:500px; margin:auto;">
-    <h2>Withdraw Funds</h2>
-
-    <div class="card mb-2" id="balance-note" style="display:none;">
-      <span class="text-muted">Available balance:</span>
-      <strong class="currency-ngn" id="available-balance">0</strong>
-    </div>
-
-    <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
-    <div id="kyc-gate"></div>
-
-    <form id="withdraw-form">
-      <div class="form-group">
-        <label class="form-label">Amount (₦)</label>
-        <input type="number" id="amount" class="form-input" required min="1000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Bank</label>
-        <select id="bank_code" class="form-select" required>
-          <option value="" disabled selected>Select your bank</option>
+      <div class="flex gap-2 mb-2">
+        <select id="status-filter" class="form-select">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved (Paid)</option>
+          <option value="rejected">Rejected</option>
         </select>
+        <button class="btn btn-primary" id="load-btn">Load</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Account Number</label>
-        <input id="account_number" class="form-input" required maxlength="10">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Account Name</label>
-        <input id="account_name" class="form-input" required>
-      </div>
-      <button type="submit" class="btn btn-primary btn-block" id="withdraw-submit-btn">Request Withdrawal</button>
-    </form>
 
-    <h3 class="mt-3">Withdrawal History</h3>
-    <div id="history">Loading…</div>
+      <div id="error-alert" class="alert alert-danger" style="display:none;"></div>
+
+      <table id="withdrawals-table" class="table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Bank Details</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </main>
   </div>
 
-  <div id="footer-container"></div>
-  <script src="/assets/js/components.js"></script>
-  <script src="/assets/js/bank-list.js"></script>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
     const supabase = createClient(
@@ -56,12 +61,8 @@
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
     );
 
-    window.supabase = supabase;
-
-    async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) window.location.href = 'login.html';
-      return user;
+    async function getToken() { 
+      return (await supabase.auth.getSession()).data.session?.access_token; 
     }
 
     function showError(msg) {
@@ -73,107 +74,86 @@
       document.getElementById('error-alert').style.display = 'none';
     }
 
-    function populateBankSelect() {
-      const select = document.getElementById('bank_code');
-      (window.NGN_BANKS || []).forEach((bank) => {
-        const opt = document.createElement('option');
-        opt.value = bank.code;
-        opt.textContent = bank.name;
-        select.appendChild(opt);
-      });
-    }
-    populateBankSelect();
-
-    let currentUser = null;
-    let currentBalance = 0;
-
-    async function loadBalanceAndGate(user) {
-      const { data: wallet } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-      currentBalance = wallet?.balance || 0;
-      document.getElementById('available-balance').textContent = currentBalance.toLocaleString();
-      document.getElementById('balance-note').style.display = 'block';
-
-      const { data: profile } = await supabase.from('profiles').select('kyc_status').eq('id', user.id).single();
-      if (profile?.kyc_status !== 'approved') {
-        document.getElementById('kyc-gate').innerHTML =
-          '<div class="alert alert-danger">KYC verification required. Please <a href="/kyc.html">upload your face and full name</a> for identity verification.</div>';
-        document.getElementById('withdraw-form').style.display = 'none';
+    function actionCell(w) {
+      if (w.status === 'pending') {
+        return `
+          <button class="btn btn-sm btn-success" onclick="approve('${w.id}')">Mark as Paid</button> 
+          <button class="btn btn-sm btn-danger" onclick="reject('${w.id}')">Reject & Refund</button>
+        `;
       }
+      if (w.status === 'approved') return '<span class="badge badge-success">Completed</span>';
+      if (w.status === 'rejected') return '<span class="badge badge-danger">Refunded</span>';
+      return '';
     }
 
-    async function callFinanceApi(action, body) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`/api/finance?action=${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify(body || {}),
+    async function load() {
+      clearError();
+      const status = document.getElementById('status-filter').value;
+      const token = await getToken();
+
+      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      const data = await res.json();
+
+      if (!res.ok) { 
+        showError(data.error || 'Failed to load withdrawals'); 
+        return; 
+      }
+
+      const tbody = document.querySelector('#withdrawals-table tbody');
+      const rows = data.withdrawals || [];
+      tbody.innerHTML = rows.map(w => {
+        const bank = w.bank_details || {};
+        return `
+          <tr>
+            <td>
+              <strong>${w.profiles?.full_name || 'No Name'}</strong><br>
+              <small class="text-muted">${w.profiles?.email || w.user_id?.slice(0,8)}</small>
+            </td>
+            <td><strong>₦${Number(w.amount).toLocaleString()}</strong></td>
+            <td>
+              <strong>${bank.bank_name || 'N/A'}</strong><br>
+              <code>${bank.account_number || ''}</code> (${bank.account_name || ''})
+            </td>
+            <td><span class="badge badge-${w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'danger' : 'warning'}">${w.status}</span></td>
+            <td><small>${new Date(w.created_at).toLocaleDateString()}</small></td>
+            <td>${actionCell(w)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="6" class="text-muted">No withdrawals found in this status.</td></tr>';
+    }
+
+    window.approve = async (id) => {
+      if (!confirm('Have you manually transferred this payment to the user?')) return;
+      clearError();
+      const token = await getToken();
+      const res = await fetch('/api/admin?action=approveWithdrawal', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ withdrawal_id: id }) 
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Request failed');
-      return json;
-    }
+      if (!res.ok) { showError(json.error || 'Approve failed'); return; }
+      load();
+    };
 
-    document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    window.reject = async (id) => {
+      if (!confirm('Are you sure you want to reject this request? The funds will be refunded back to the user\'s wallet.')) return;
       clearError();
-      if (!currentUser) return;
+      const token = await getToken();
+      const res = await fetch('/api/admin?action=rejectWithdrawal', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+        body: JSON.stringify({ withdrawal_id: id }) 
+      });
+      const json = await res.json();
+      if (!res.ok) { showError(json.error || 'Reject failed'); return; }
+      load();
+    };
 
-      const amount = +document.getElementById('amount').value;
-      const bankSelect = document.getElementById('bank_code');
-      const bank_code = bankSelect.value;
-      const bank_name = bankSelect.selectedOptions[0]?.textContent || '';
-      const account_number = document.getElementById('account_number').value;
-      const account_name = document.getElementById('account_name').value;
-
-      if (!bank_code) return showError('Please select your bank.');
-      if (amount > currentBalance) return showError('That amount is more than your available balance.');
-
-      const btn = document.getElementById('withdraw-submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Submitting…';
-
-      try {
-        await callFinanceApi('createWithdrawal', { amount, bank_code, bank_name, account_number, account_name });
-        alert('Withdrawal request submitted!');
-        location.reload();
-      } catch (err) {
-        showError(err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Request Withdrawal';
-      }
-    });
-
-    function statusBadge(status) {
-      if (status === 'approved') return '<span class="badge badge-success">Paid</span>';
-      if (status === 'rejected') return '<span class="badge badge-danger">Rejected</span>';
-      return '<span class="badge badge-warning">Pending</span>';
-    }
-
-    async function loadHistory(user) {
-      const { data } = await supabase.from('withdrawals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      document.getElementById('history').innerHTML = data?.map(w => `
-        <div class="txn-row" style="display:flex; justify-content:space-between; align-items:center; padding: 0.75rem 0; border-bottom:1px solid #eee;">
-          <div>
-            <strong>₦${w.amount.toLocaleString()}</strong><br>
-            <small class="text-muted">${w.bank_details?.bank_name || ''} - ${w.bank_details?.account_number || ''}</small>
-          </div>
-          <div style="text-align:right;">
-            ${statusBadge(w.status)}<br>
-            <small class="text-muted">${new Date(w.created_at).toLocaleDateString()}</small>
-          </div>
-        </div>`).join('') || '<p class="text-muted">No withdrawals yet.</p>';
-    }
-
-    checkAuth().then(async (user) => {
-      if (!user) return;
-      currentUser = user;
-      await loadBalanceAndGate(user);
-      await loadHistory(user);
-    });
+    document.getElementById('load-btn').addEventListener('click', load);
+    load();
   </script>
 </body>
 </html>
