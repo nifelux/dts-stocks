@@ -135,17 +135,18 @@ async function loadRecentDeposits() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
 
-  const res = await fetch('/api/finance?action=listDeposits', {
+  const res = await fetch('/api/finance?action=getDeposits', {
     headers: { Authorization: `Bearer ${session.access_token}` }
   });
   const data = await res.json();
 
   const container = document.getElementById('pending-deposits');
-  if (!data || data.length === 0) {
+  const rows = data.deposits || [];
+  if (rows.length === 0) {
     container.innerHTML = '<div class="card text-muted">No deposit requests yet.</div>';
     return;
   }
-  container.innerHTML = `<div class="card">${data.map(d => `
+  container.innerHTML = `<div class="card">${rows.map(d => `
     <div class="txn-row">
       <span class="txn-icon" style="background:#DDF7EA;color:var(--clr-green-deep);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
@@ -161,4 +162,5 @@ async function loadRecentDeposits() {
 loadRecentDeposits();
 </script>
 </body>
-</html>
+      </html>
+      
