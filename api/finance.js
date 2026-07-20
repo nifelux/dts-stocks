@@ -27,27 +27,29 @@ export default async function handler(req, res) {
   }
 }
 
-// Deposits don't require KYC — only withdrawals do. (Previously both
-// createDeposit and listDeposits carried a copy-pasted withdrawal KYC
-// gate that blocked deposits entirely for unverified users.)
 async function createDeposit(req, res) {
   const user = await verifyUser(req);
   const { amount, payment_method, proof_image_url } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid deposit amount' });
+  if (!proof_image_url) return res.status(400).json({ error: 'Payment proof screenshot is required' });
 
   const { data, error } = await supabaseAdmin.from('deposits').insert({
-    user_id: user.id, amount, payment_method, proof_image_url
+    user_id: user.id,
+    amount,
+    payment_method: payment_method || 'bank_transfer',
+    proof_image_url
   }).select().single();
+
   if (error) return res.status(400).json({ error: error.message });
 
   await supabaseAdmin.from('activity_logs').insert({ user_id: user.id, action: 'deposit_request', details: { amount } });
-  await sendTelegramMessage(`💰 New deposit request: ₦${amount} from ${user.email}`);
+  await sendTelegramMessage(`💰 New manual deposit request: ₦${amount} from ${user.email}`);
   return res.status(200).json(data);
 }
 
 async function listDeposits(req, res) {
   const user = await verifyUser(req);
-  // User sees own; if admin, we'll handle in admin api. But here just own.
   const { data } = await supabaseAdmin.from('deposits').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
   return res.status(200).json(data);
 }
@@ -55,14 +57,13 @@ async function listDeposits(req, res) {
 async function approveDeposit(req, res) {
   const admin = await verifyAdmin(req);
   const { deposit_id, admin_notes } = req.body;
-  // Fetch deposit
+
   const { data: deposit } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
   if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
   if (deposit.status !== 'pending') return res.status(400).json({ error: 'Deposit already processed' });
 
-  // Update deposit
   await supabaseAdmin.from('deposits').update({ status: 'approved', admin_notes, updated_at: new Date() }).eq('id', deposit_id);
-  // Create approved transaction (will trigger wallet credit)
+
   const { error: txnErr } = await supabaseAdmin.from('transactions').insert({
     user_id: deposit.user_id,
     type: 'deposit',
@@ -93,7 +94,6 @@ async function createWithdrawal(req, res) {
   const { amount, bank_code, bank_name, account_number, account_name } = req.body;
   try { withdrawSchema.parse(req.body); } catch (e) { return res.status(400).json({ error: e.errors[0].message }); }
 
-  // Check withdrawal settings
   const { data: settings } = await supabaseAdmin.from('settings').select('*').eq('key', 'withdrawal').single();
   const wSettings = settings?.value || {};
   if (!wSettings.enabled) return res.status(400).json({ error: 'Withdrawals disabled' });
@@ -106,17 +106,12 @@ async function createWithdrawal(req, res) {
   if (amount < (wSettings.min_amount || 5000)) return res.status(400).json({ error: `Min withdrawal: ₦${wSettings.min_amount}` });
   if (amount > (wSettings.max_amount || 500000)) return res.status(400).json({ error: `Max withdrawal: ₦${wSettings.max_amount}` });
 
-  // Check balance
   const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user.id).single();
   if (wallet.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
 
-  // Idempotency key to prevent duplicate
-  const idempotencyKey = req.headers['x-idempotency-key'] || `${user.id}_${Date.now()}`;
   const { data: existing } = await supabaseAdmin.from('withdrawals').select('id').eq('user_id', user.id).eq('status', 'pending').maybeSingle();
   if (existing) return res.status(400).json({ error: 'You already have a pending withdrawal' });
 
-  // bank_code is required downstream by the Nekpay payout endpoint
-  // (api/withdraw-payout.js) — stored here alongside the display name.
   const { data, error } = await supabaseAdmin.from('withdrawals').insert({
     user_id: user.id, amount,
     bank_details: { bank_code, bank_name, account_number, account_name },
@@ -124,7 +119,6 @@ async function createWithdrawal(req, res) {
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
 
-  // Pre-debit transaction only when approved, so we don't deduct now
   await supabaseAdmin.from('activity_logs').insert({ user_id: user.id, action: 'withdrawal_request', details: { amount } });
   await sendTelegramMessage(`🏧 New withdrawal request: ₦${amount} from ${user.email}`);
   return res.status(200).json(data);
@@ -146,11 +140,9 @@ async function approveWithdrawal(req, res) {
   const { data: wd } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
   if (!wd || wd.status !== 'pending') return res.status(400).json({ error: 'Invalid withdrawal' });
 
-  // Check balance again
   const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', wd.user_id).single();
   if (wallet.balance < wd.amount) return res.status(400).json({ error: 'Insufficient balance' });
 
-  // Create transaction (will deduct wallet)
   const { error: txnErr } = await supabaseAdmin.from('transactions').insert({
     user_id: wd.user_id,
     type: 'withdrawal',
