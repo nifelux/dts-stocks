@@ -1023,3 +1023,34 @@ body.has-tab-bar{padding-bottom:88px}
 .welfare-plan-figures{display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.9rem}
 .welfare-plan-figure .value{font-family:var(--font-display);font-weight:600;font-size:1.1rem;color:var(--clr-purple-ink)}
 .welfare-plan-figure .label{font-size:0.72rem;color:var(--clr-text-secondary)}
+
+/* ============================================================
+   SEGMENT TABS — pill switcher (Investment / Welfare, etc.)
+   ============================================================ */
+.segment-tabs{
+  display:flex;gap:0.6rem;overflow-x:auto;padding-bottom:0.3rem;margin-bottom:1.5rem;
+  scrollbar-width:none;
+}
+.segment-tabs::-webkit-scrollbar{display:none}
+.segment-tab{
+  flex-shrink:0;display:inline-flex;align-items:center;gap:0.4rem;
+  padding:0.6rem 1.2rem;border-radius:999px;border:1px solid var(--clr-border);
+  background:var(--clr-card);color:var(--clr-text-secondary);font-weight:700;font-size:0.9rem;
+  cursor:pointer;font-family:inherit;transition:background var(--transition),color var(--transition),border-color var(--transition),box-shadow var(--transition);
+}
+.segment-tab:hover{border-color:var(--clr-purple)}
+.segment-tab.is-active{
+  background:var(--clr-purple-ink);border-color:var(--clr-purple-ink);color:#fff;
+  box-shadow:0 8px 20px -8px rgba(36,26,77,0.5);
+}
+.segment-panel{display:none}
+.segment-panel.is-active{display:block}
+
+/* History rows (Investment/Welfare history pages) */
+.history-card{position:relative}
+.history-card-status{position:absolute;top:1rem;right:1rem}
+.history-card-title{font-family:var(--font-display);font-weight:600;font-size:1.1rem;margin-bottom:0.2rem}
+.history-card-meta{font-size:0.82rem;color:var(--clr-text-secondary);margin-bottom:0.9rem}
+.history-card-figures{display:flex;gap:1.5rem;flex-wrap:wrap}
+.history-card-figure .value{font-family:var(--font-display);font-weight:600;font-size:1.05rem;color:var(--clr-purple-ink)}
+.history-card-figure .label{font-size:0.72rem;color:var(--clr-text-secondary)}
