@@ -21,6 +21,12 @@ export default async function handler(req, res) {
       case 'createWithdrawal':
       case 'withdraw':
         return await createWithdrawal(req, res);
+      case 'createWithdrawalProof':
+        return await createWithdrawalProof(req, res);
+      case 'listWithdrawalProofs':
+        return await listWithdrawalProofs(req, res);
+      case 'addProofComment':
+        return await addProofComment(req, res);
       default:
         return res.status(400).json({ error: `Invalid or missing action parameter: '${action}'` });
     }
@@ -272,3 +278,91 @@ async function createWithdrawal(req, res) {
     withdrawal: wd
   });
 }
+
+/**
+ * Withdrawal Proofs Community — submit, list, and comment on proofs.
+ * These actions were called by withdraw-proofs.html but never existed
+ * here, which is why loading the feed always failed.
+ */
+async function createWithdrawalProof(req, res) {
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized: Please log in' });
+
+  const { amount, caption, image_url } = req.body;
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ error: 'Please enter a valid amount' });
+  }
+  if (!image_url) {
+    return res.status(400).json({ error: 'Missing proof image' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('withdrawal_proofs')
+    .insert({
+      user_id: user.id,
+      amount: Number(amount),
+      caption: caption || null,
+      image_url // storage path in the private 'proofs' bucket
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(201).json(data);
+}
+
+async function listWithdrawalProofs(req, res) {
+  const { data: proofs, error } = await supabaseAdmin
+    .from('withdrawal_proofs')
+    .select('*, profiles(full_name, email)')
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!proofs || proofs.length === 0) return res.status(200).json([]);
+
+  // Comments for all proofs in one query, then group in memory
+  const proofIds = proofs.map(p => p.id);
+  const { data: allComments } = await supabaseAdmin
+    .from('proof_comments')
+    .select('*, profiles(full_name, email)')
+    .in('proof_id', proofIds)
+    .order('created_at', { ascending: true });
+
+  // The 'proofs' bucket is private (same as KYC/deposit screenshots) —
+  // resolve each image to a short-lived signed URL here, server-side,
+  // rather than exposing the bucket publicly. This is what the
+  // frontend's `display_url` field expects.
+  const withUrls = await Promise.all(proofs.map(async (p) => {
+    const { data: signed } = await supabaseAdmin.storage
+      .from('proofs')
+      .createSignedUrl(p.image_url, 3600); // 1 hour, long enough for a feed view
+    return {
+      ...p,
+      display_url: signed?.signedUrl || null,
+      proof_comments: (allComments || []).filter(c => c.proof_id === p.id)
+    };
+  }));
+
+  return res.status(200).json(withUrls);
+}
+
+async function addProofComment(req, res) {
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized: Please log in' });
+
+  const { proof_id, comment } = req.body;
+  if (!proof_id || !comment || !comment.trim()) {
+    return res.status(400).json({ error: 'Comment cannot be empty' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('proof_comments')
+    .insert({ proof_id, user_id: user.id, comment: comment.trim() })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(201).json(data);
+        }
+    
