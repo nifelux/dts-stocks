@@ -1,25 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Team – DTL Stocks</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Our Team – DTL Stocks</title>
+<meta name="description" content="Meet the team behind DTL Stocks' investment products, compliance, and investor support.">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="header-container"></div>>
-  <nav class="navbar"><div class="logo"><strong>DTL Stocks</strong></div><ul class="nav-links"><li><a href="dashboard.html">Dashboard</a></li><li><a href="team.html" class="active">Team</a></li></ul></nav>
-  <div class="section"><h2>My Downline</h2><div id="team-list"></div></div>
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
-    (async () => {
-      const user = (await supabase.auth.getUser()).data.user;
-      const { data } = await supabase.from('profiles').select('full_name, email, created_at').eq('referred_by', user.id);
-      document.getElementById('team-list').innerHTML = data?.map(d => `<div class="card mb-1">${d.full_name||d.email} – Joined ${new Date(d.created_at).toLocaleDateString()}</div>`).join('') || 'No referrals yet.';
-    })();
-  </script>
-  <div id="footer-container"></div>
-  <script src="/assets/js/components.js"></script>
+<div id="header-container"></div>
+
+<section class="page-hero-mkt">
+  <div class="mkt-eyebrow">Our Team</div>
+  <h1>The people behind your investments</h1>
+  <p>Every deposit, withdrawal, and KYC submission on DTL Stocks is reviewed by a person on this team — not just a script.</p>
+</section>
+
+<section class="mkt-section">
+  <div class="mkt-eyebrow">How We're Organized</div>
+  <h2 class="mkt-heading" style="font-size:clamp(1.5rem,3vw,2rem);max-width:600px;">Four teams, one job: protect your capital</h2>
+  <div class="grid-3 mt-3">
+    <div class="card">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;">Investment Management</h3>
+      <p class="text-muted">Selects, monitors, and retires the investment products offered on the platform, and sets the daily return rates you see.</p>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;">Compliance &amp; Verification</h3>
+      <p class="text-muted">Reviews every KYC submission and manually confirms each deposit and withdrawal request before it's processed.</p>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;">Investor Support</h3>
+      <p class="text-muted">Answers questions through the in-app Support Center and the <a href="contact.html">Contact page</a>, usually within 24 hours.</p>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;">Risk &amp; Finance</h3>
+      <p class="text-muted">Tracks platform-wide exposure across sectors and makes sure payouts are backed by real, diversified capital.</p>
+    </div>
+    <div class="card">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;">Technology &amp; Platform</h3>
+      <p class="text-muted">Builds and maintains the dashboard, wallet, and security systems that keep your account accurate and safe.</p>
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section is-tinted">
+  <div class="mkt-eyebrow">How We Work</div>
+  <h2 class="mkt-heading" style="font-size:clamp(1.5rem,3vw,2rem);max-width:600px;">Nothing runs on autopilot</h2>
+  <div class="feature-row mt-3">
+    <span class="feature-mark">✓</span>
+    <div>
+      <h4>Manual review, every time</h4>
+      <p>Deposits, withdrawals, and KYC documents are checked by our compliance team before any status changes — no automatic approvals.</p>
+    </div>
+  </div>
+  <div class="feature-row">
+    <span class="feature-mark">↻</span>
+    <div>
+      <h4>Ongoing product monitoring</h4>
+      <p>Our investment team continuously tracks each product's performance and adjusts availability if a sector's outlook changes.</p>
+    </div>
+  </div>
+  <div class="feature-row">
+    <span class="feature-mark">✉</span>
+    <div>
+      <h4>A real reply, not a bot</h4>
+      <p>Messages sent through Contact or the in-app Support Center are read and answered by our investor support team.</p>
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section" style="padding-top:0;">
+  <div class="cta-band">
+    <h2>Have a question for the team?</h2>
+    <p>Reach out and we'll get back to you within 24 hours.</p>
+    <a href="contact.html" class="btn btn-primary btn-lg">Contact Us</a>
+  </div>
+</section>
+
+<footer class="mkt-footer">
+  <div class="mkt-footer-grid">
+    <div class="mkt-footer-brand">
+      <a href="/" class="brand"><span class="brand-mark">DTL</span><span class="brand-name">Stocks</span></a>
+      <p>Secure, long-term investment products with transparent daily returns.</p>
+    </div>
+    <div>
+      <h5>Company</h5>
+      <div class="mkt-footer-links">
+        <a href="about.html">About Us</a>
+        <a href="team.html">Our Team</a>
+        <a href="news.html">Company News</a>
+        <a href="contact.html">Contact</a>
+      </div>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <div class="mkt-footer-links">
+        <a href="faq.html">FAQ</a>
+        <a href="register.html">Get Started</a>
+        <a href="login.html">Login</a>
+        <a href="contact.html">Contact Us</a>
+      </div>
+    </div>
+  </div>
+  <div class="mkt-footer-bottom">© 2026 DTL Stocks. All rights reserved.</div>
+</footer>
+
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
 </body>
 </html>
