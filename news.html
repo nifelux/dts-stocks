@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company News – DTL Stocks</title>
+<meta name="description" content="Announcements and updates from DTL Stocks.">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="header-container"></div>
+
+<section class="page-hero-mkt">
+  <div class="mkt-eyebrow">Company News</div>
+  <h1>Updates and announcements</h1>
+  <p>Product changes, platform updates, and news from the DTL Stocks team.</p>
+</section>
+
+<section class="mkt-section" style="max-width:760px;">
+  <div id="news-list">
+    <div class="card text-center">Loading news…</div>
+  </div>
+</section>
+
+<footer class="mkt-footer">
+  <div class="mkt-footer-grid">
+    <div class="mkt-footer-brand">
+      <a href="/" class="brand"><span class="brand-mark">DTL</span><span class="brand-name">Stocks</span></a>
+      <p>Secure, long-term investment products with transparent daily returns.</p>
+    </div>
+    <div>
+      <h5>Company</h5>
+      <div class="mkt-footer-links">
+        <a href="about.html">About Us</a>
+        <a href="team.html">Our Team</a>
+        <a href="news.html">Company News</a>
+        <a href="contact.html">Contact</a>
+      </div>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <div class="mkt-footer-links">
+        <a href="faq.html">FAQ</a>
+        <a href="register.html">Get Started</a>
+        <a href="login.html">Login</a>
+        <a href="contact.html">Contact Us</a>
+      </div>
+    </div>
+  </div>
+  <div class="mkt-footer-bottom">© 2026 DTL Stocks. All rights reserved.</div>
+</footer>
+
+<div id="footer-container"></div>
+<script src="/assets/js/components.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+async function loadNews() {
+  const { data, error } = await supabase
+    .from('company_news')
+    .select('*')
+    .eq('is_published', true)
+    .order('published_at', { ascending: false });
+
+  const container = document.getElementById('news-list');
+
+  if (error || !data || data.length === 0) {
+    container.innerHTML = `
+      <div class="history-empty" style="background:var(--clr-card);border:1px solid var(--clr-border);border-radius:var(--radius-lg);">
+        <span class="history-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+        </span>
+        <strong>No news yet</strong>
+        <span>Check back here for platform updates and announcements.</span>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = data.map(n => `
+    <div class="card mb-2">
+      <div class="text-muted" style="font-size:0.8rem;margin-bottom:0.4rem;">${formatDate(n.published_at)}</div>
+      <h3 style="font-family:var(--font-display);font-size:1.2rem;margin-bottom:0.5rem;">${n.title}</h3>
+      <p style="margin:0;">${n.body}</p>
+    </div>
+  `).join('');
+}
+
+loadNews();
+</script>
+</body>
+</html>
