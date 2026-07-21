@@ -241,16 +241,13 @@ async function loadVIP() {
 }
 
 async function loadStats() {
-  const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-  const { data: investSum } = await supabase.from('transactions').select('amount').eq('type', 'investment').eq('status', 'approved');
-  const { data: paidSum } = await supabase.from('transactions').select('amount').in('type', ['earning', 'referral']).eq('status', 'approved');
+  const { data, error } = await supabase.rpc('get_public_stats');
+  if (error || !data || data.length === 0) return;
 
-  const totalInvested = (investSum || []).reduce((s, r) => s + Number(r.amount), 0);
-  const totalPaid = (paidSum || []).reduce((s, r) => s + Number(r.amount), 0);
-
-  document.getElementById('stat-users').textContent = (userCount || 0).toLocaleString();
-  document.getElementById('stat-invested').textContent = totalInvested.toLocaleString();
-  document.getElementById('stat-paid').textContent = totalPaid.toLocaleString();
+  const stats = data[0];
+  document.getElementById('stat-users').textContent = Number(stats.user_count || 0).toLocaleString();
+  document.getElementById('stat-invested').textContent = Number(stats.total_invested || 0).toLocaleString();
+  document.getElementById('stat-paid').textContent = Number(stats.total_paid || 0).toLocaleString();
 }
 
 loadProducts();
