@@ -786,6 +786,175 @@ body.has-tab-bar{padding-bottom:88px}
 .history-empty-icon svg{width:22px;height:22px}
 .history-empty strong{color:var(--clr-text)}
 
+/* ============================================================
+   MARKETING / PUBLIC PAGES (index, about, contact, faq)
+   ============================================================ */
+.mkt-section{padding:5rem 1.5rem;max-width:1160px;margin:0 auto}
+.mkt-section.is-tinted{background:var(--clr-surface)}
+.mkt-eyebrow{
+  font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--clr-purple-deep);margin-bottom:0.6rem;
+}
+.mkt-heading{font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);line-height:1.15}
+.mkt-lede{color:var(--clr-text-secondary);font-size:1.05rem;max-width:640px}
+.mkt-lede.is-centered{margin:0.75rem auto 0}
+
+/* Hero */
+.hero-mkt{
+  position:relative;overflow:hidden;background:var(--gradient-gold);
+  padding:5.5rem 1.5rem 4.5rem;text-align:center;isolation:isolate;
+}
+.hero-mkt::before{
+  content:'₦';position:absolute;font-family:var(--font-display);font-weight:600;
+  font-size:34rem;line-height:1;color:rgba(36,26,77,0.06);
+  top:50%;left:50%;transform:translate(-50%,-42%);z-index:-1;pointer-events:none;
+}
+.hero-mkt-inner{max-width:680px;margin:0 auto}
+.hero-mkt h1{
+  font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);
+  font-size:clamp(2.1rem,5vw,3.4rem);line-height:1.08;margin-bottom:1rem;
+}
+.hero-mkt p{font-size:1.15rem;color:rgba(36,26,77,0.78);max-width:520px;margin:0 auto 2rem}
+.hero-mkt-ctas{display:flex;gap:0.85rem;justify-content:center;flex-wrap:wrap}
+.hero-mkt .btn-outline{border-color:rgba(36,26,77,0.35);color:var(--clr-purple-ink)}
+.hero-mkt .btn-outline:hover{border-color:var(--clr-purple-ink);color:var(--clr-purple-ink);background:rgba(255,255,255,0.35)}
+.hero-proof{
+  margin-top:2.25rem;display:inline-flex;align-items:center;gap:0.6rem;
+  background:rgba(255,255,255,0.55);backdrop-filter:blur(6px);
+  border-radius:999px;padding:0.5rem 1rem;font-size:0.85rem;color:var(--clr-purple-ink);font-weight:600;
+}
+.hero-proof-dot{width:8px;height:8px;border-radius:50%;background:var(--clr-green);flex-shrink:0;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.35}}
+
+/* Trust / stat strip */
+.trust-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;max-width:1160px;
+  margin:-2.5rem auto 0;position:relative;z-index:2;padding:0 1.5rem;
+}
+.trust-card{
+  background:var(--clr-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);
+  padding:1.4rem 1rem;text-align:center;
+}
+.trust-number{font-family:var(--font-display);font-weight:600;font-size:1.6rem;color:var(--clr-purple-ink)}
+.trust-label{font-size:0.78rem;color:var(--clr-text-secondary);margin-top:0.2rem}
+@media (max-width:760px){.trust-strip{grid-template-columns:repeat(2,1fr)}}
+
+/* Feature rows (About) */
+.feature-row{display:flex;gap:1rem;padding:1.1rem 0;border-bottom:1px solid var(--clr-border)}
+.feature-row:last-child{border-bottom:none}
+.feature-mark{
+  flex-shrink:0;width:40px;height:40px;border-radius:50%;background:#FEF3D6;color:var(--clr-yellow-deep);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:600;
+}
+.feature-row h4{margin-bottom:0.25rem}
+.feature-row p{color:var(--clr-text-secondary);margin:0}
+
+/* How it works — real sequence, serif numerals as the device */
+.step-row{display:flex;gap:1.25rem;align-items:flex-start}
+.step-num{
+  font-family:var(--font-display);font-weight:600;font-size:2.2rem;color:var(--clr-purple);
+  line-height:1;flex-shrink:0;width:2.4rem;
+}
+.step-row h4{margin-bottom:0.3rem}
+.step-row p{color:var(--clr-text-secondary);margin:0}
+.step-divider{width:1px;background:var(--clr-border);margin:0.5rem 0 0.5rem 1.2rem;flex-shrink:0}
+
+/* Product / VIP tier cards */
+.tier-card{position:relative;overflow:hidden}
+.tier-card.is-featured{border:1px solid var(--clr-purple);box-shadow:var(--shadow-purple)}
+.tier-ribbon{
+  position:absolute;top:0.8rem;right:-2rem;transform:rotate(40deg);
+  background:var(--clr-purple-deep);color:#fff;font-size:0.68rem;font-weight:700;
+  padding:0.2rem 2.5rem;letter-spacing:0.05em;text-transform:uppercase;
+}
+.tier-roi{font-family:var(--font-display);font-weight:600;font-size:1.9rem;color:var(--clr-green-deep)}
+
+/* FAQ accordion */
+.faq-item{border-bottom:1px solid var(--clr-border)}
+.faq-item:last-child{border-bottom:none}
+.faq-item summary{
+  list-style:none;cursor:pointer;padding:1.1rem 0;font-weight:600;color:var(--clr-purple-ink);
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;
+}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary::after{
+  content:'+';font-family:var(--font-display);font-size:1.3rem;color:var(--clr-purple);flex-shrink:0;
+  transition:transform var(--transition);
+}
+.faq-item[open] summary::after{transform:rotate(45deg)}
+.faq-item p{color:var(--clr-text-secondary);padding-bottom:1.1rem;margin:0}
+
+/* Testimonials */
+.quote-card{
+  background:var(--clr-card);border-radius:var(--radius-lg);box-shadow:var(--shadow);
+  padding:1.6rem 1.4rem;position:relative;
+}
+.quote-mark{font-family:var(--font-display);font-size:2.6rem;color:var(--clr-yellow);line-height:1;display:block;margin-bottom:0.4rem}
+.quote-card p{margin:0 0 0.9rem;color:var(--clr-text)}
+.quote-author{font-size:0.85rem;color:var(--clr-text-secondary);font-weight:600}
+
+/* Final CTA band */
+.cta-band{
+  background:var(--gradient-purple);border-radius:var(--radius-lg);
+  padding:3rem 2rem;text-align:center;color:#fff;max-width:1160px;margin:0 auto 1rem;
+}
+.cta-band h2{font-family:var(--font-display);font-weight:600;font-size:clamp(1.6rem,3vw,2.1rem);margin-bottom:0.6rem}
+.cta-band p{color:rgba(255,255,255,0.82);margin-bottom:1.5rem}
+
+/* Rich marketing footer */
+.mkt-footer{background:var(--clr-surface);border-top:1px solid var(--clr-border);padding:3.5rem 1.5rem 2rem}
+.mkt-footer-grid{
+  max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:2.5rem;
+}
+.mkt-footer-brand .brand-mark{margin-bottom:0.75rem;display:inline-flex}
+.mkt-footer-brand p{color:var(--clr-text-secondary);max-width:280px;margin-top:0.6rem}
+.mkt-footer h5{font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);margin-bottom:0.9rem}
+.mkt-footer-links{display:flex;flex-direction:column;gap:0.6rem}
+.mkt-footer-links a{color:var(--clr-text-secondary);font-size:0.92rem}
+.mkt-footer-links a:hover{color:var(--clr-purple-deep)}
+.mkt-footer-bottom{
+  max-width:1160px;margin:2.5rem auto 0;padding-top:1.5rem;border-top:1px solid var(--clr-border);
+  text-align:center;color:var(--clr-text-secondary);font-size:0.82rem;
+}
+
+/* Lighter hero for interior public pages (about/contact/faq) */
+.page-hero-mkt{
+  background:var(--clr-surface);border-bottom:1px solid var(--clr-border);
+  padding:3.5rem 1.5rem 3rem;text-align:center;
+}
+.page-hero-mkt h1{
+  font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);
+  font-size:clamp(1.9rem,4vw,2.6rem);margin-bottom:0.75rem;
+}
+.page-hero-mkt p{color:var(--clr-text-secondary);max-width:560px;margin:0 auto;font-size:1.05rem}
+
+.faq-group-label{
+  font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);
+  font-size:1.1rem;margin:2rem 0 0.5rem;
+}
+.faq-group-label:first-child{margin-top:0}
+
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start}
+.contact-channel{display:flex;gap:0.9rem;padding:1rem 0;border-bottom:1px solid var(--clr-border)}
+.contact-channel:last-child{border-bottom:none}
+.contact-channel-icon{
+  flex-shrink:0;width:38px;height:38px;border-radius:50%;background:#EDE7FF;color:var(--clr-purple-deep);
+  display:flex;align-items:center;justify-content:center;
+}
+.contact-channel h4{margin-bottom:0.15rem}
+.contact-channel p{margin:0;color:var(--clr-text-secondary)}
+@media (max-width:760px){.contact-grid{grid-template-columns:1fr}}
+
+@media (max-width:760px){
+  .mkt-footer-grid{grid-template-columns:1fr 1fr;}
+  .mkt-footer-brand{grid-column:1/-1}
+}
+@media (max-width:480px){
+  .mkt-section{padding:3.5rem 1.25rem}
+  .hero-mkt{padding:4rem 1.25rem 3.5rem}
+  .hero-mkt::before{font-size:20rem}
+  .step-row{gap:0.9rem}
+}
 @media (max-width:480px){
   .quick-chip{min-width:0}
 }
