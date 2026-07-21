@@ -338,15 +338,20 @@ body{padding-top:72px}
 body.has-tab-bar{padding-bottom:88px}
 
 .tab-bar{
+  display:none; /* hidden by default — only shown once a logged-in user
+    is confirmed (see components.js). This avoids a flash of the tab
+    bar appearing then disappearing on guest pages like login/register,
+    since auth state resolution is async. */
   position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
   width:calc(100% - 28px);max-width:460px;z-index:900;
-  display:flex;justify-content:space-between;
+  justify-content:space-between;
   background:rgba(255,255,255,0.9);backdrop-filter:blur(16px) saturate(160%);
   -webkit-backdrop-filter:blur(16px) saturate(160%);
   border:1px solid rgba(15,23,42,0.06);
   border-radius:24px;padding:0.5rem 0.4rem;
   box-shadow:0 16px 40px -14px rgba(76,52,176,0.35);
 }
+.tab-bar.is-visible{display:flex}
 .tab-item{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:0.2rem;
   padding:0.4rem 0.2rem;border-radius:16px;text-decoration:none;
