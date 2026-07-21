@@ -3,277 +3,200 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DTL Stocks – Smart Long-Term Investments</title>
+<title>DTL Stocks – Secure, Long-Term Investments with Daily Returns</title>
+<meta name="description" content="DTL Stocks is a Naira-based investment platform offering diversified, long-term products with transparent daily returns.">
+<link rel="stylesheet" href="assets/css/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css">
-<style>
-  /* Hide everything until we've confirmed this is a guest — avoids a
-     flash of the marketing page for already-logged-in visitors who are
-     about to be redirected to their dashboard. */
-  #page-content{visibility:hidden}
-
-  .home-hero{
-    background:var(--gradient-purple);color:#fff;position:relative;overflow:hidden;
-    padding:5rem 1.5rem 6rem;text-align:center;
-  }
-  .home-hero::before{
-    content:'';position:absolute;top:-100px;right:-80px;width:320px;height:320px;
-    background:radial-gradient(circle, rgba(245,180,0,0.35), transparent 70%);border-radius:50%;
-  }
-  .home-hero::after{
-    content:'';position:absolute;bottom:-120px;left:-60px;width:280px;height:280px;
-    background:radial-gradient(circle, rgba(18,183,106,0.25), transparent 70%);border-radius:50%;
-  }
-  .home-hero-inner{position:relative;z-index:1;max-width:640px;margin:0 auto}
-  .home-hero h1{font-family:var(--font-display);font-weight:600;font-size:2.6rem;line-height:1.15;margin-bottom:1rem}
-  .home-hero p{color:rgba(255,255,255,0.82);font-size:1.05rem;max-width:480px;margin:0 auto 2rem}
-  .home-hero-actions{display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap}
-
-  .home-section{padding:3.5rem 1.5rem;max-width:1100px;margin:0 auto}
-  .home-section-header{text-align:center;max-width:560px;margin:0 auto 2.25rem}
-  .home-eyebrow{font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--clr-purple-deep)}
-  .home-section-header h2{font-family:var(--font-display);font-weight:600;font-size:1.9rem;color:var(--clr-purple-ink);margin:0.3rem 0 0.5rem}
-  .home-section-header p{margin-bottom:0}
-
-  .home-grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.5rem}
-  .home-icon-card{
-    background:var(--clr-card);border:1px solid var(--clr-border);border-radius:var(--radius-lg);
-    padding:1.75rem 1.5rem;text-align:center;transition:transform var(--transition),box-shadow var(--transition);
-  }
-  .home-icon-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
-  .home-icon-badge{
-    width:52px;height:52px;border-radius:16px;margin:0 auto 1rem;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .home-icon-badge svg{width:24px;height:24px}
-  .home-icon-card h3{font-family:var(--font-display);font-weight:600;font-size:1.15rem;margin-bottom:0.4rem}
-  .home-icon-card p{font-size:0.9rem;margin-bottom:0}
-
-  .step-card{position:relative;padding-top:2.5rem}
-  .step-number{
-    position:absolute;top:0;left:50%;transform:translateX(-50%);
-    width:36px;height:36px;border-radius:50%;background:var(--gradient-gold);color:#2b1d00;
-    font-family:var(--font-display);font-weight:600;display:flex;align-items:center;justify-content:center;
-  }
-
-  .vip-marketing-strip{display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem}
-  .vip-marketing-chip{
-    padding:0.5rem 1.1rem;border-radius:999px;font-weight:700;font-size:0.85rem;
-    background:var(--clr-surface);border:1px solid var(--clr-border);color:var(--clr-text);
-  }
-  .vip-marketing-chip.tone-bronze{background:#F3E7DA;color:#7A4E23;border-color:transparent}
-  .vip-marketing-chip.tone-silver{background:#EAEAEE;color:#585868;border-color:transparent}
-  .vip-marketing-chip.tone-gold{background:#FFF3D6;color:#8A6300;border-color:transparent}
-  .vip-marketing-chip.tone-platinum{background:#EDE7FF;color:var(--clr-purple-deep);border-color:transparent}
-
-  .home-stats-row{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1.5rem;
-    background:var(--clr-purple-ink);border-radius:var(--radius-lg);padding:2.5rem 1.5rem;color:#fff;text-align:center;
-  }
-  .home-stat-value{font-family:var(--font-display);font-weight:600;font-size:2rem}
-  .home-stat-label{color:rgba(255,255,255,0.65);font-size:0.85rem;margin-top:0.2rem}
-
-  .testimonial-card{
-    background:var(--clr-card);border:1px solid var(--clr-border);border-radius:var(--radius-lg);
-    padding:1.5rem;font-size:0.92rem;color:var(--clr-text);
-  }
-  .testimonial-avatar{
-    width:36px;height:36px;border-radius:50%;background:var(--gradient-purple);color:#fff;
-    display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;
-    margin-bottom:0.75rem;
-  }
-
-  .home-footer{background:var(--clr-surface);padding:3.5rem 1.5rem 1.5rem;margin-top:2rem;border-top:1px solid var(--clr-border)}
-  .home-footer-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:2.5rem}
-  .home-footer-col h4{font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);margin-bottom:1rem;font-size:1.02rem}
-  .home-footer-col a{display:block;margin-bottom:0.6rem;color:var(--clr-text-secondary);text-decoration:none;font-size:0.9rem}
-  .home-footer-col a:hover{color:var(--clr-purple-deep)}
-  .home-footer-bottom{text-align:center;padding-top:2rem;margin-top:2.5rem;border-top:1px solid var(--clr-border);color:var(--clr-text-secondary);font-size:0.85rem}
-
-  @media (max-width:768px){
-    .home-footer-grid{grid-template-columns:repeat(2,1fr)}
-    .home-hero h1{font-size:2.1rem}
-  }
-</style>
 </head>
 <body>
 <div id="header-container"></div>
 
-<div id="page-content">
-
-<section class="home-hero">
-  <div class="home-hero-inner">
-    <h1>Grow Your Wealth with DTL Stocks</h1>
-    <p>Secure long-term investments with daily returns. Trusted by thousands of Nigerians building generational wealth.</p>
-    <div class="home-hero-actions">
-      <a href="register.html" class="hero-btn hero-btn-solid">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Start Investing Now
-      </a>
-      <a href="login.html" class="hero-btn hero-btn-outline">Login</a>
+<!-- Hero -->
+<section class="hero-mkt">
+  <div class="hero-mkt-inner">
+    <h1>Grow your wealth, one daily return at a time.</h1>
+    <p>Diversified, long-term investment products with transparent daily payouts — built for Nigerians who'd rather compound steadily than gamble on volatility.</p>
+    <div class="hero-mkt-ctas">
+      <a href="register.html" class="btn btn-primary btn-lg">Start Investing</a>
+      <a href="#how-it-works" class="btn btn-outline btn-lg">See how it works</a>
+    </div>
+    <div class="hero-proof">
+      <span class="hero-proof-dot"></span>
+      <span id="hero-proof-text">Returns paid out daily to active investors</span>
     </div>
   </div>
 </section>
 
-<section id="about" class="home-section">
-  <div class="home-section-header">
-    <div class="home-eyebrow">About Us</div>
-    <h2>Why DTL Stocks</h2>
-    <p class="text-muted">A premier investment platform dedicated to stable, long-term growth — diversified across real estate, agriculture, and technology.</p>
+<!-- Trust strip -->
+<div class="trust-strip" id="stats-container">
+  <div class="trust-card"><div class="trust-number" id="stat-users">—</div><div class="trust-label">Registered Investors</div></div>
+  <div class="trust-card"><div class="trust-number currency-ngn" id="stat-invested">—</div><div class="trust-label">Total Invested</div></div>
+  <div class="trust-card"><div class="trust-number currency-ngn" id="stat-paid">—</div><div class="trust-label">Returns Paid Out</div></div>
+  <div class="trust-card"><div class="trust-number">100%</div><div class="trust-label">Bank-Transfer Secured</div></div>
+</div>
+
+<!-- About -->
+<section id="about" class="mkt-section">
+  <div class="mkt-eyebrow">Why DTL Stocks</div>
+  <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);max-width:520px;">Built for people who want to watch their money grow, not gamble on it.</h2>
+  <div class="feature-row mt-3">
+    <span class="feature-mark">₦</span>
+    <div>
+      <h4>Diversified by design</h4>
+      <p>Your capital is spread across real estate, agriculture, and technology-backed products — not a single bet.</p>
+    </div>
   </div>
-  <div class="home-grid-3">
-    <div class="home-icon-card">
-      <span class="home-icon-badge" style="background:#EDE7FF;color:var(--clr-purple-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-      </span>
-      <h3>Our Mission</h3>
-      <p class="text-muted">Democratizing wealth creation by making profitable investments accessible to every Nigerian.</p>
+  <div class="feature-row">
+    <span class="feature-mark">%</span>
+    <div>
+      <h4>Daily, not promised-someday</h4>
+      <p>Returns accrue and post to your wallet every day your investment is active, visible in real time on your dashboard.</p>
     </div>
-    <div class="home-icon-card">
-      <span class="home-icon-badge" style="background:#DDF7EA;color:var(--clr-green-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-      </span>
-      <h3>Our Vision</h3>
-      <p class="text-muted">Becoming Africa's most trusted investment platform, powering financial freedom for millions.</p>
-    </div>
-    <div class="home-icon-card">
-      <span class="home-icon-badge" style="background:#FFF3D6;color:var(--clr-yellow-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
-      </span>
-      <h3>Why Long-Term?</h3>
-      <p class="text-muted">Compounding returns, minimized risk, and predictable income streams over time.</p>
+  </div>
+  <div class="feature-row">
+    <span class="feature-mark">⟳</span>
+    <div>
+      <h4>Compounding rewards patience</h4>
+      <p>Long-term products smooth out short-term noise and let daily returns stack into meaningful growth.</p>
     </div>
   </div>
 </section>
 
-<section id="process" class="home-section" style="background:var(--clr-surface);">
-  <div class="home-section-header">
-    <div class="home-eyebrow">Getting Started</div>
-    <h2>How It Works</h2>
+<!-- Products -->
+<section id="invest" class="mkt-section is-tinted">
+  <div class="text-center mb-3">
+    <div class="mkt-eyebrow">Investment Products</div>
+    <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);">Pick a product that fits your goal</h2>
+    <p class="mkt-lede is-centered">Every product states its daily return, duration, and minimum up front — no fine print.</p>
   </div>
-  <div class="home-grid-3">
-    <div class="home-icon-card step-card">
-      <span class="step-number">1</span>
-      <span class="home-icon-badge" style="background:#EDE7FF;color:var(--clr-purple-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
-      </span>
-      <h3>Register</h3>
-      <p class="text-muted">Create your free account in minutes.</p>
+  <div class="grid-3 mt-3" id="products-container">
+    <div class="card">Loading products…</div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how-it-works" class="mkt-section">
+  <div class="text-center mb-3">
+    <div class="mkt-eyebrow">Getting Started</div>
+    <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);">From sign-up to your first payout</h2>
+  </div>
+  <div class="grid-3 mt-3">
+    <div class="step-row">
+      <span class="step-num">1</span>
+      <div><h4>Register</h4><p>Create your free account and verify your identity in minutes.</p></div>
     </div>
-    <div class="home-icon-card step-card">
-      <span class="step-number">2</span>
-      <span class="home-icon-badge" style="background:#DDF7EA;color:var(--clr-green-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-      </span>
-      <h3>Deposit</h3>
-      <p class="text-muted">Fund your wallet via bank transfer.</p>
+    <div class="step-row">
+      <span class="step-num">2</span>
+      <div><h4>Deposit</h4><p>Fund your wallet by bank transfer — as little as ₦500 to get started.</p></div>
     </div>
-    <div class="home-icon-card step-card">
-      <span class="step-number">3</span>
-      <span class="home-icon-badge" style="background:#FFF3D6;color:var(--clr-yellow-deep);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>
-      </span>
-      <h3>Invest</h3>
-      <p class="text-muted">Choose a package and start earning daily.</p>
+    <div class="step-row">
+      <span class="step-num">3</span>
+      <div><h4>Invest &amp; earn</h4><p>Choose a product and watch daily returns land in your wallet.</p></div>
     </div>
   </div>
 </section>
 
-<section id="vip" class="home-section">
-  <div class="home-section-header">
-    <div class="home-eyebrow">Loyalty Rewards</div>
-    <h2>VIP Program</h2>
-    <p class="text-muted">Unlock exclusive benefits as you grow with us.</p>
+<!-- VIP -->
+<section id="vip" class="mkt-section is-tinted">
+  <div class="text-center mb-3">
+    <div class="mkt-eyebrow">VIP Program</div>
+    <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);">The more you grow with us, the more you unlock</h2>
+    <p class="mkt-lede is-centered">Tiers are based on your deposits, active investments, and referrals — higher tiers earn a bigger daily bonus.</p>
   </div>
-  <div class="vip-marketing-strip" id="vip-container">
-    <span class="vip-marketing-chip tone-bronze">Loading…</span>
-  </div>
-</section>
-
-<section class="home-section">
-  <div class="home-stats-row" id="stats-container">
-    <div><div class="home-stat-value">1,000+</div><div class="home-stat-label">Registered Users</div></div>
-    <div><div class="home-stat-value">₦50M+</div><div class="home-stat-label">Total Invested</div></div>
-    <div><div class="home-stat-value">₦12M+</div><div class="home-stat-label">Paid Returns</div></div>
-    <div><div class="home-stat-value">100%</div><div class="home-stat-label">Secure</div></div>
+  <div class="grid-3 mt-3" id="vip-container">
+    <div class="card">Loading VIP tiers…</div>
   </div>
 </section>
 
-<section id="faq" class="home-section" style="background:var(--clr-surface);">
-  <div class="home-section-header">
-    <div class="home-eyebrow">Questions</div>
-    <h2>Frequently Asked</h2>
+<!-- FAQ -->
+<section id="faq" class="mkt-section">
+  <div class="text-center mb-3">
+    <div class="mkt-eyebrow">Questions</div>
+    <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);">Frequently asked questions</h2>
   </div>
-  <div class="home-grid-3">
-    <div class="home-icon-card" style="text-align:left;">
-      <h3 style="font-size:1rem;">Is my investment safe?</h3>
-      <p class="text-muted">Yes — we use diversified asset allocation and capital protection strategies.</p>
+  <div class="card mt-3" style="max-width:760px;margin:1.5rem auto 0;">
+    <details class="faq-item" open>
+      <summary>How are my funds protected?</summary>
+      <p>Your capital is spread across diversified, real-world backed products rather than a single asset, and every deposit and withdrawal is manually reviewed by our team before it's processed.</p>
+    </details>
+    <details class="faq-item">
+      <summary>How do I withdraw my funds?</summary>
+      <p>Request a withdrawal from your dashboard with your bank details. Our team reviews and pays out requests manually, usually within 24 hours.</p>
+    </details>
+    <details class="faq-item">
+      <summary>What's the minimum deposit?</summary>
+      <p>You can fund your wallet with as little as ₦500 via bank transfer.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Do I need to verify my identity?</summary>
+      <p>Yes — KYC verification is required before you can withdraw. It's a one-time step from your dashboard.</p>
+    </details>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="mkt-section is-tinted">
+  <div class="text-center mb-3">
+    <div class="mkt-eyebrow">Investor Voices</div>
+    <h2 class="mkt-heading" style="font-size:clamp(1.6rem,3vw,2.2rem);">What our investors say</h2>
+  </div>
+  <div class="grid-3 mt-3">
+    <div class="quote-card">
+      <span class="quote-mark">"</span>
+      <p>I've been with DTL Stocks for 2 years. Consistent daily returns, no surprises.</p>
+      <div class="quote-author">— Chidi A.</div>
     </div>
-    <div class="home-icon-card" style="text-align:left;">
-      <h3 style="font-size:1rem;">How do I withdraw?</h3>
-      <p class="text-muted">Request a withdrawal from your dashboard; processed within hours.</p>
+    <div class="quote-card">
+      <span class="quote-mark">"</span>
+      <p>The VIP program actually rewards loyalty — my bonus went up as I stayed active.</p>
+      <div class="quote-author">— Fatima K.</div>
     </div>
-    <div class="home-icon-card" style="text-align:left;">
-      <h3 style="font-size:1rem;">What's the minimum deposit?</h3>
-      <p class="text-muted">You can start with as low as ₦1,000.</p>
+    <div class="quote-card">
+      <span class="quote-mark">"</span>
+      <p>Finally, an investment platform I can trust with clear numbers I can check daily.</p>
+      <div class="quote-author">— Emeka O.</div>
     </div>
   </div>
 </section>
 
-<section class="home-section">
-  <div class="home-section-header">
-    <div class="home-eyebrow">Testimonials</div>
-    <h2>What Our Investors Say</h2>
-  </div>
-  <div class="home-grid-3">
-    <div class="testimonial-card">
-      <span class="testimonial-avatar">CA</span>
-      <p style="margin-bottom:0;">"I've been with DTL Stocks for 2 years. Consistent returns!" — <strong>Chidi A.</strong></p>
-    </div>
-    <div class="testimonial-card">
-      <span class="testimonial-avatar">FK</span>
-      <p style="margin-bottom:0;">"The VIP program rewards loyalty. I love it." — <strong>Fatima K.</strong></p>
-    </div>
-    <div class="testimonial-card">
-      <span class="testimonial-avatar">EO</span>
-      <p style="margin-bottom:0;">"Finally, an investment platform I can trust." — <strong>Emeka O.</strong></p>
-    </div>
+<!-- Final CTA -->
+<section class="mkt-section" style="padding-top:0;">
+  <div class="cta-band">
+    <h2>Ready to put your money to work?</h2>
+    <p>Join thousands of Nigerians already earning daily returns on DTL Stocks.</p>
+    <a href="register.html" class="btn btn-primary btn-lg">Create your free account</a>
   </div>
 </section>
 
-<footer class="home-footer">
-  <div class="home-footer-grid">
-    <div class="home-footer-col">
-      <a href="/" class="brand" style="display:inline-flex; margin-bottom:0.75rem;">
-        <span class="brand-mark">DTL</span>
-        <span class="brand-name">Stocks</span>
-      </a>
-      <p class="text-muted" style="font-size:0.9rem;">Secure, long-term investment products with transparent daily returns.</p>
+<!-- Rich footer -->
+<footer class="mkt-footer">
+  <div class="mkt-footer-grid">
+    <div class="mkt-footer-brand">
+      <a href="/" class="brand"><span class="brand-mark">DTL</span><span class="brand-name">Stocks</span></a>
+      <p>Secure, long-term investment products with transparent daily returns.</p>
     </div>
-    <div class="home-footer-col">
-      <h4>Company</h4>
-      <a href="/about.html">About Us</a>
-      <a href="/team.html">Our Team</a>
-      <a href="/company-news.html">Company News</a>
-      <a href="/contact.html">Contact</a>
+    <div>
+      <h5>Company</h5>
+      <div class="mkt-footer-links">
+        <a href="about.html">About Us</a>
+        <a href="team.html">Our Team</a>
+        <a href="news.html">Company News</a>
+        <a href="contact.html">Contact</a>
+      </div>
     </div>
-    <div class="home-footer-col">
-      <h4>Platform</h4>
-      <a href="/faq.html">FAQ</a>
-      <a href="/register.html">Get Started</a>
-      <a href="/login.html">Login</a>
-    </div>
-    <div class="home-footer-col">
-      <h4>Support</h4>
-      <a href="/faq.html">Help Center</a>
-      <a href="/contact.html">Contact Us</a>
+    <div>
+      <h5>Support</h5>
+      <div class="mkt-footer-links">
+        <a href="faq.html">FAQ</a>
+        <a href="register.html">Get Started</a>
+        <a href="login.html">Login</a>
+        <a href="contact.html">Contact Us</a>
+      </div>
     </div>
   </div>
-  <div class="home-footer-bottom">&copy; <span id="footer-year">2026</span> DTL Stocks. All rights reserved.</div>
+  <div class="mkt-footer-bottom">© 2026 DTL Stocks. All rights reserved.</div>
 </footer>
-
-</div><!-- /#page-content -->
 
 <div id="footer-container"></div>
 <script src="/assets/js/components.js"></script>
@@ -282,28 +205,57 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
 window.supabase = supabase;
 
-document.getElementById('footer-year').textContent = new Date().getFullYear();
+async function loadProducts() {
+  const { data } = await supabase.from('products').select('*').eq('is_locked', false).limit(3);
+  const container = document.getElementById('products-container');
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="card text-center">No products available yet — check back soon.</div>';
+    return;
+  }
+  container.innerHTML = data.map(p => `
+    <div class="card">
+      <h3>${p.name}</h3>
+      <p class="text-muted">${p.description || ''}</p>
+      <div class="tier-roi">${p.daily_roi_percent}%<span style="font-size:0.9rem;color:var(--clr-text-secondary);font-family:var(--font-family);font-weight:400;"> / day</span></div>
+      <p style="margin:0.6rem 0 0;"><strong>Duration:</strong> ${p.duration_days} days</p>
+      <p style="margin:0.2rem 0 1rem;"><strong>Min invest:</strong> <span class="currency-ngn">${p.min_invest.toLocaleString()}</span></p>
+      <a href="register.html" class="btn btn-primary btn-sm btn-block">Invest Now</a>
+    </div>
+  `).join('');
+}
 
 async function loadVIP() {
   const { data } = await supabase.from('vip_levels').select('*').order('min_deposit', { ascending: true });
   const container = document.getElementById('vip-container');
-  if (!data || data.length === 0) { container.innerHTML = ''; return; }
-  container.innerHTML = data.map(v =>
-    `<span class="vip-marketing-chip tone-${v.level}">${v.level.toUpperCase()} · ₦${v.min_deposit.toLocaleString()}+</span>`
-  ).join('');
+  if (!data || data.length === 0) return;
+  container.innerHTML = data.map((v, i) => `
+    <div class="card tier-card${i === data.length - 1 ? ' is-featured' : ''}">
+      ${i === data.length - 1 ? '<span class="tier-ribbon">Top Tier</span>' : ''}
+      <h3 style="font-family:var(--font-display);">${v.level.toUpperCase()}</h3>
+      <p style="margin:0.5rem 0 0;">Min deposit: <span class="currency-ngn">${v.min_deposit.toLocaleString()}</span></p>
+      <p style="margin:0.2rem 0;">Min active investments: ${v.min_investments}</p>
+      <p style="margin:0.2rem 0 0.8rem;">Min referrals: ${v.min_referrals}</p>
+      <div class="tier-roi" style="font-size:1.4rem;">+${v.daily_bonus_percent}%<span style="font-size:0.82rem;color:var(--clr-text-secondary);font-family:var(--font-family);font-weight:400;"> daily bonus</span></div>
+    </div>
+  `).join('');
 }
 
-// Index is a guest-only landing page — an already-logged-in visitor
-// should never see it, they should land straight on their dashboard.
-(async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    window.location.href = '/dashboard.html';
-    return; // don't reveal or render marketing content
-  }
-  document.getElementById('page-content').style.visibility = 'visible';
-  loadVIP();
-})();
+async function loadStats() {
+  const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+  const { data: investSum } = await supabase.from('transactions').select('amount').eq('type', 'investment').eq('status', 'approved');
+  const { data: paidSum } = await supabase.from('transactions').select('amount').in('type', ['earning', 'referral']).eq('status', 'approved');
+
+  const totalInvested = (investSum || []).reduce((s, r) => s + Number(r.amount), 0);
+  const totalPaid = (paidSum || []).reduce((s, r) => s + Number(r.amount), 0);
+
+  document.getElementById('stat-users').textContent = (userCount || 0).toLocaleString();
+  document.getElementById('stat-invested').textContent = totalInvested.toLocaleString();
+  document.getElementById('stat-paid').textContent = totalPaid.toLocaleString();
+}
+
+loadProducts();
+loadVIP();
+loadStats();
 </script>
 </body>
 </html>
