@@ -2,7 +2,6 @@
  * Investment API
  * Actions: products (list public), createInvestment, myInvestments, productDetail
  * Admin actions: createProduct, updateProduct, deleteProduct, toggleLock
- * Cron actions (moved from cron.js): triggerDailyIncome, cronStatus
  */
 import supabaseAdmin from '../lib/supabase.js';
 import { verifyUser, verifyAdmin } from '../lib/auth.js';
@@ -17,14 +16,16 @@ export default async function handler(req, res) {
       case 'productDetail': return productDetail(req, res);
       case 'createInvestment': return createInvestment(req, res);
       case 'myInvestments': return myInvestments(req, res);
+      // Welfare (user-configured amount + duration, claim-at-maturity)
+      case 'welfareRate': return welfareRate(req, res);
+      case 'createWelfareInvestment': return createWelfareInvestment(req, res);
+      case 'myWelfarePlans': return myWelfarePlans(req, res);
+      case 'claimWelfare': return claimWelfare(req, res);
       // Admin
       case 'createProduct': return createProduct(req, res);
       case 'updateProduct': return updateProduct(req, res);
       case 'deleteProduct': return deleteProduct(req, res);
       case 'toggleLock': return toggleLock(req, res);
-      // Cron management (moved from cron.js — same domain: investment payouts)
-      case 'triggerDailyIncome': return triggerDailyIncome(req, res);
-      case 'cronStatus': return getCronStatus(req, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (err) {
@@ -89,8 +90,10 @@ async function createInvestment(req, res) {
     : (amount * product.daily_roi_percent) / 100;
 
   // Deduct balance via transaction — this INSERT (status already
-  // 'approved') is what the trg_process_transaction trigger picks up
-  // to actually subtract from wallets.balance for type='investment'.
+  // 'approved') is what trg_process_transaction picks up to actually
+  // subtract from wallets.balance for type='investment'. This is the
+  // step the old client-side direct-insert flow was skipping entirely,
+  // which is why balances weren't being debited.
   const { data: txn, error: txnErr } = await supabaseAdmin.from('transactions').insert({
     user_id: user.id,
     type: 'investment',
@@ -123,9 +126,9 @@ async function createInvestment(req, res) {
     details: { investment_id: investment.id, amount, product: product.name }
   });
 
-  // Notification failures must never make an already-successful
-  // investment look like it failed — the money has moved and the
-  // investment row exists at this point.
+  // Notification failures (e.g. Telegram env vars not configured) must
+  // never make an already-successful investment look like it failed —
+  // the money has moved and the investment row exists at this point.
   try {
     await sendTelegramMessage(`📈 New investment: ₦${amount} in ${product.name} by ${user.email}`);
   } catch (notifyErr) {
@@ -142,6 +145,164 @@ async function myInvestments(req, res) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
   return res.status(200).json(data);
+}
+
+// ============================================================
+// WELFARE — user-configured amount + duration, claim at maturity
+// ============================================================
+// Daily rate tapers from WELFARE_MAX_RATE at the minimum duration down
+// to WELFARE_MIN_RATE at the maximum duration: shorter plans earn a
+// higher day-rate, longer plans earn a lower day-rate but accumulate a
+// bigger total payout simply by running longer. Linear on purpose —
+// easy to verify and explain to a user, no hidden curve.
+const WELFARE_MIN_AMOUNT = 5000;
+const WELFARE_MIN_DAYS = 3;
+const WELFARE_MAX_DAYS = 365;
+const WELFARE_MAX_RATE = 3.0;   // %/day at WELFARE_MIN_DAYS
+const WELFARE_MIN_RATE = 0.5;   // %/day at WELFARE_MAX_DAYS
+
+function welfareDailyRatePercent(days) {
+  const clamped = Math.min(WELFARE_MAX_DAYS, Math.max(WELFARE_MIN_DAYS, Number(days)));
+  const span = WELFARE_MAX_DAYS - WELFARE_MIN_DAYS;
+  return WELFARE_MAX_RATE - (WELFARE_MAX_RATE - WELFARE_MIN_RATE) * (clamped - WELFARE_MIN_DAYS) / span;
+}
+
+// Lets the frontend show a live daily-profit preview as the user drags
+// the duration slider, without trusting a client-supplied rate later.
+async function welfareRate(req, res) {
+  const days = Number(req.query.days);
+  if (!days || days < WELFARE_MIN_DAYS || days > WELFARE_MAX_DAYS) {
+    return res.status(400).json({ error: `Duration must be between ${WELFARE_MIN_DAYS} and ${WELFARE_MAX_DAYS} days` });
+  }
+  const rate = welfareDailyRatePercent(days);
+  return res.status(200).json({ daily_rate_percent: Number(rate.toFixed(3)) });
+}
+
+async function createWelfareInvestment(req, res) {
+  const user = await verifyUser(req);
+  const { amount, duration_days } = req.body;
+
+  if (!amount || Number(amount) < WELFARE_MIN_AMOUNT) {
+    return res.status(400).json({ error: `Minimum Welfare investment is ₦${WELFARE_MIN_AMOUNT.toLocaleString()}` });
+  }
+  if (!duration_days || duration_days < WELFARE_MIN_DAYS || duration_days > WELFARE_MAX_DAYS) {
+    return res.status(400).json({ error: `Duration must be between ${WELFARE_MIN_DAYS} and ${WELFARE_MAX_DAYS} days` });
+  }
+
+  // Gate: Welfare can only be purchased alongside an active (normal)
+  // investment.
+  const { count: activeCount } = await supabaseAdmin
+    .from('investments')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('status', 'active');
+  if (!activeCount) {
+    return res.status(400).json({ error: 'You need an active investment before you can start a Welfare plan.' });
+  }
+
+  // Wallet balance check
+  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user.id).single();
+  if (!wallet || Number(wallet.balance) < Number(amount)) {
+    return res.status(400).json({ error: 'Insufficient balance' });
+  }
+
+  const dailyRate = welfareDailyRatePercent(duration_days);
+  const dailyProfit = (Number(amount) * dailyRate) / 100;
+  const startDate = new Date();
+  const maturityDate = new Date(startDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000);
+
+  // Debit the wallet for the capital — this insert (status 'approved')
+  // is what trg_process_transaction picks up to subtract from
+  // wallets.balance for type='investment', same mechanism the normal
+  // investment flow above uses.
+  const { error: txnErr } = await supabaseAdmin.from('transactions').insert({
+    user_id: user.id,
+    type: 'investment',
+    amount: Number(amount),
+    status: 'approved',
+    reference: `wf_${Date.now()}_${user.id.substring(0, 8)}`
+  });
+  if (txnErr) return res.status(400).json({ error: txnErr.message });
+
+  const { data: plan, error } = await supabaseAdmin.from('welfare_investments').insert({
+    user_id: user.id,
+    amount: Number(amount),
+    duration_days: Number(duration_days),
+    daily_rate_percent: Number(dailyRate.toFixed(3)),
+    daily_profit: Number(dailyProfit.toFixed(2)),
+    start_date: startDate,
+    maturity_date: maturityDate,
+    status: 'active'
+  }).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+
+  await supabaseAdmin.from('activity_logs').insert({
+    user_id: user.id,
+    action: 'welfare_create',
+    details: { welfare_id: plan.id, amount, duration_days }
+  });
+
+  try {
+    await sendTelegramMessage(`🌾 New Welfare plan: ₦${amount} for ${duration_days} days by ${user.email}`);
+  } catch (notifyErr) {
+    console.error('Telegram notification failed (welfare plan still created):', notifyErr.message);
+  }
+
+  return res.status(200).json(plan);
+}
+
+async function myWelfarePlans(req, res) {
+  const user = await verifyUser(req);
+  const { data, error } = await supabaseAdmin
+    .from('welfare_investments')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  return res.status(200).json(data);
+}
+
+async function claimWelfare(req, res) {
+  const user = await verifyUser(req);
+  const { id } = req.body;
+
+  const { data: plan } = await supabaseAdmin.from('welfare_investments').select('*').eq('id', id).eq('user_id', user.id).single();
+  if (!plan) return res.status(404).json({ error: 'Welfare plan not found' });
+  if (plan.status !== 'active') return res.status(400).json({ error: 'This plan has already been claimed' });
+  if (new Date(plan.maturity_date) > new Date()) return res.status(400).json({ error: 'This plan has not matured yet' });
+
+  const totalPayout = Number(plan.amount) + Number(plan.daily_profit) * Number(plan.duration_days);
+
+  // Credit the wallet directly via RPC rather than inserting an
+  // 'approved' transaction row: trg_process_transaction fires on ANY
+  // row where status='approved' regardless of type, and it doesn't
+  // recognize 'welfare_claim' as a known credit type, so we can't
+  // safely rely on it here without risking either a silent no-op or an
+  // unintended double-credit if the trigger's fallback behavior ever
+  // changes. The RPC is the same proven mechanism already used for
+  // withdrawal-rejection refunds.
+  const { error: rpcErr } = await supabaseAdmin.rpc('credit_wallet_balance', {
+    p_user_id: user.id,
+    p_amount: totalPayout
+  });
+  if (rpcErr) return res.status(500).json({ error: rpcErr.message });
+
+  // Audit-only record — status is deliberately NOT 'approved' so this
+  // insert can never fire trg_process_transaction and double-credit
+  // the wallet on top of the RPC call above.
+  await supabaseAdmin.from('transactions').insert({
+    user_id: user.id,
+    type: 'welfare_claim',
+    amount: totalPayout,
+    status: 'paid',
+    reference: `wfclaim_${plan.id}`,
+    meta: { welfare_id: plan.id, capital: plan.amount, profit: totalPayout - Number(plan.amount) }
+  });
+
+  await supabaseAdmin.from('welfare_investments')
+    .update({ status: 'claimed', claimed_at: new Date() })
+    .eq('id', plan.id);
+
+  return res.status(200).json({ message: 'Claimed successfully', amount: totalPayout });
 }
 
 // Admin actions
@@ -176,21 +337,5 @@ async function toggleLock(req, res) {
   const { id, is_locked } = req.body;
   await supabaseAdmin.from('products').update({ is_locked }).eq('id', id);
   return res.status(200).json({ message: `Product ${is_locked ? 'locked' : 'unlocked'}` });
-}
-
-// ============================================================
-// Cron management (moved from cron.js)
-// ============================================================
-
-async function triggerDailyIncome(req, res) {
-  await verifyAdmin(req);
-  const { error } = await supabaseAdmin.rpc('distribute_daily_income');
-  if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ message: 'Daily income distribution completed' });
-}
-
-async function getCronStatus(req, res) {
-  await verifyAdmin(req);
-  const { data } = await supabaseAdmin.from('cron_logs').select('*').order('created_at', { ascending: false }).limit(10);
-  return res.status(200).json(data);
-}
+                                 }
+    
