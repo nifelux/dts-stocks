@@ -17,14 +17,33 @@
     <p class="text-muted" style="margin-bottom:0;">Choose a plan that fits your goals.</p>
   </div>
 
+  <!-- ================= INVESTMENT ================= -->
+  <div class="products-section-label">
+    <h3>Investment</h3>
+    <span class="products-section-badge">Fixed daily income</span>
+  </div>
   <div class="product-grid" id="products-list">
     <div class="card">Loading…</div>
   </div>
 
+  <!-- ================= WELFARE ================= -->
+  <div class="products-section-label">
+    <h3>Welfare</h3>
+    <span class="products-section-badge">Claim at maturity</span>
+  </div>
+  <div id="welfare-gate"></div>
+
+  <!-- ================= MY INVESTMENTS ================= -->
   <div class="page-header mt-3">
     <h2>My Investments</h2>
   </div>
   <div id="my-investments"><div class="card">Loading…</div></div>
+
+  <!-- ================= MY WELFARE PLANS ================= -->
+  <div class="page-header mt-3">
+    <h2>My Welfare Plans</h2>
+  </div>
+  <div id="my-welfare"><div class="card">Loading…</div></div>
 </div>
 
 <div id="footer-container"></div>
@@ -39,10 +58,25 @@ window.supabase = supabase;
 
 const PRODUCT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>';
 
+// Same formula as the server (investment.js) — used here only for a
+// live preview while the user drags the slider. The server always
+// recalculates authoritatively; nothing here is trusted for the actual
+// purchase.
+const WELFARE_MIN_AMOUNT = 5000;
+const WELFARE_MIN_DAYS = 3;
+const WELFARE_MAX_DAYS = 365;
+const WELFARE_MAX_RATE = 3.0;
+const WELFARE_MIN_RATE = 0.5;
+function welfareDailyRatePercent(days) {
+  const span = WELFARE_MAX_DAYS - WELFARE_MIN_DAYS;
+  return WELFARE_MAX_RATE - (WELFARE_MAX_RATE - WELFARE_MIN_RATE) * (days - WELFARE_MIN_DAYS) / span;
+}
+
 async function getToken() {
   return (await supabase.auth.getSession()).data.session?.access_token;
 }
 
+// ---------------- INVESTMENT ----------------
 async function loadProducts() {
   const { data } = await supabase.from('products').select('*').eq('is_locked', false);
   const list = document.getElementById('products-list');
@@ -84,7 +118,6 @@ async function loadProducts() {
       const productId = btn.dataset.id;
       const product = data.find(p => p.id === productId);
       if (product.daily_income_amount != null) {
-        // Fixed-price package — no amount prompt, purchase at the set price
         if (confirm(`Invest ₦${product.min_invest.toLocaleString()} in ${product.name}?`)) {
           invest(productId, product.min_invest);
         }
@@ -113,10 +146,7 @@ async function invest(productId, amount) {
   try {
     data = await res.json();
   } catch (parseErr) {
-    // Response wasn't JSON — usually means the serverless function
-    // crashed or the route doesn't exist, and returned an HTML error
-    // page instead. Surface the status code so it's actually debuggable.
-    return alert(`Server returned an unexpected response (status ${res.status}). Check the Vercel function logs for /api/investments.`);
+    return alert(`Server returned an unexpected response (status ${res.status}). Check the Vercel function logs for /api/investment.`);
   }
 
   if (!res.ok) return alert(data.error || `Investment failed (status ${res.status}).`);
@@ -146,8 +176,170 @@ async function loadMyInvestments() {
   }).join('')}</div>`;
 }
 
+// ---------------- WELFARE ----------------
+async function hasActiveInvestment(userId) {
+  const { count } = await supabase.from('investments').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'active');
+  return (count || 0) > 0;
+}
+
+function welfareBuilderHTML() {
+  return `
+    <div class="card welfare-builder">
+      <div class="welfare-row">
+        <div>
+          <label class="form-label">Amount to invest</label>
+          <div class="amount-field">
+            <span class="amount-prefix">₦</span>
+            <input type="number" id="welfare-amount" class="form-input" min="${WELFARE_MIN_AMOUNT}" placeholder="${WELFARE_MIN_AMOUNT.toLocaleString()}" value="${WELFARE_MIN_AMOUNT}">
+          </div>
+          <div class="field-hint">Minimum ₦${WELFARE_MIN_AMOUNT.toLocaleString()}</div>
+        </div>
+        <div>
+          <label class="form-label">Duration: <span class="welfare-days-value" id="welfare-days-value">30 days</span></label>
+          <div class="welfare-slider-wrap">
+            <input type="range" id="welfare-days" class="welfare-slider" min="${WELFARE_MIN_DAYS}" max="${WELFARE_MAX_DAYS}" value="30">
+            <div class="welfare-slider-labels"><span>${WELFARE_MIN_DAYS} days</span><span>${WELFARE_MAX_DAYS} days</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="welfare-preview" id="welfare-preview">
+        <div class="welfare-preview-row"><span>Daily rate</span><span id="wf-rate">—</span></div>
+        <div class="welfare-preview-row"><span>Daily profit</span><span id="wf-daily">—</span></div>
+        <div class="welfare-preview-row"><span>Total profit at maturity</span><span id="wf-total-profit">—</span></div>
+        <div class="welfare-preview-row"><span>Capital + profit paid at maturity</span><span id="wf-total-payout">—</span></div>
+        <div class="welfare-preview-total" id="wf-payout-big">—</div>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="welfare-submit-btn" style="margin-top:1.25rem;">Start Welfare Plan</button>
+      <p class="field-hint mt-1" style="margin-bottom:0;">Profit accrues daily but is only paid out — capital plus all accumulated profit — once your plan matures.</p>
+    </div>`;
+}
+
+function updateWelfarePreview() {
+  const amount = Math.max(0, Number(document.getElementById('welfare-amount').value) || 0);
+  const days = Number(document.getElementById('welfare-days').value);
+  document.getElementById('welfare-days-value').textContent = `${days} days`;
+
+  const rate = welfareDailyRatePercent(days);
+  const dailyProfit = (amount * rate) / 100;
+  const totalProfit = dailyProfit * days;
+  const totalPayout = amount + totalProfit;
+
+  document.getElementById('wf-rate').textContent = `${rate.toFixed(2)}% / day`;
+  document.getElementById('wf-daily').textContent = `₦${dailyProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  document.getElementById('wf-total-profit').textContent = `₦${totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  document.getElementById('wf-total-payout').textContent = `₦${totalPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  document.getElementById('wf-payout-big').textContent = `₦${totalPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })} at maturity`;
+}
+
+async function createWelfare() {
+  const amount = Number(document.getElementById('welfare-amount').value);
+  const days = Number(document.getElementById('welfare-days').value);
+  if (!amount || amount < WELFARE_MIN_AMOUNT) return alert(`Minimum Welfare investment is ₦${WELFARE_MIN_AMOUNT.toLocaleString()}`);
+
+  const btn = document.getElementById('welfare-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const token = await getToken();
+  const res = await fetch('/api/investment?action=createWelfareInvestment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ amount, duration_days: days })
+  });
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.textContent = 'Start Welfare Plan';
+
+  if (!res.ok) return alert(data.error || 'Could not start Welfare plan.');
+  alert('Welfare plan started! Capital and profit will be available to claim at maturity.');
+  location.reload();
+}
+
+async function loadWelfareGate() {
+  const user = (await supabase.auth.getUser()).data.user;
+  const gate = document.getElementById('welfare-gate');
+  const unlocked = await hasActiveInvestment(user.id);
+
+  if (!unlocked) {
+    gate.innerHTML = `
+      <div class="welfare-locked">
+        <span class="welfare-locked-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <div>
+          <h4>Requires an active investment</h4>
+          <p class="text-muted">Welfare plans are only available once you have at least one active investment above.</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  gate.innerHTML = welfareBuilderHTML();
+  document.getElementById('welfare-amount').addEventListener('input', updateWelfarePreview);
+  document.getElementById('welfare-days').addEventListener('input', updateWelfarePreview);
+  document.getElementById('welfare-submit-btn').addEventListener('click', createWelfare);
+  updateWelfarePreview();
+}
+
+function welfareStatusBadge(plan) {
+  if (plan.status === 'claimed') return '<span class="badge">CLAIMED</span>';
+  const matured = new Date(plan.maturity_date) <= new Date();
+  return matured ? '<span class="badge badge-success">READY TO CLAIM</span>' : '<span class="badge badge-warning">ACTIVE</span>';
+}
+
+async function claimWelfarePlan(id) {
+  const token = await getToken();
+  const res = await fetch('/api/investment?action=claimWelfare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ id })
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Could not claim this plan.');
+  alert(`Claimed ₦${Number(data.amount).toLocaleString()}!`);
+  location.reload();
+}
+
+async function loadMyWelfare() {
+  const token = await getToken();
+  const res = await fetch('/api/investment?action=myWelfarePlans', { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  const container = document.getElementById('my-welfare');
+
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="card">No Welfare plans yet.</div>';
+    return;
+  }
+
+  container.innerHTML = data.map(plan => {
+    const matured = new Date(plan.maturity_date) <= new Date();
+    const totalProfit = Number(plan.daily_profit) * Number(plan.duration_days);
+    const totalPayout = Number(plan.amount) + totalProfit;
+    return `
+    <div class="card welfare-plan-card mb-2">
+      <span class="welfare-plan-status">${welfareStatusBadge(plan)}</span>
+      <h4>₦${Number(plan.amount).toLocaleString()} · ${plan.duration_days} days</h4>
+      <div class="welfare-plan-meta">Matures ${new Date(plan.maturity_date).toLocaleDateString()} · ${plan.daily_rate_percent}%/day</div>
+      <div class="welfare-plan-figures">
+        <div class="welfare-plan-figure"><div class="value">₦${totalProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div class="label">Total profit</div></div>
+        <div class="welfare-plan-figure"><div class="value">₦${totalPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div><div class="label">Payout at maturity</div></div>
+      </div>
+      ${plan.status === 'active' && matured ? `<button class="btn btn-primary btn-block claim-btn" data-id="${plan.id}">Claim ₦${totalPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })}</button>` : ''}
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.claim-btn').forEach(btn => {
+    btn.addEventListener('click', () => claimWelfarePlan(btn.dataset.id));
+  });
+}
+
 loadProducts();
 loadMyInvestments();
+loadWelfareGate();
+loadMyWelfare();
 </script>
 </body>
 </html>
