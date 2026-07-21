@@ -136,8 +136,12 @@ document.getElementById('upload-proof-form').addEventListener('submit', async (e
 
   try {
     // 1. Upload to storage bucket
+    // Path MUST start with the user's own UUID as the first folder
+    // segment — the 'proofs' bucket's RLS policy checks
+    // (storage.foldername(name))[1] = auth.uid(), so a path like
+    // "withdrawal_proofs/<id>_<ts>.ext" gets rejected by RLS.
     const fileExt = file.name.split('.').pop();
-    const filePath = `withdrawal_proofs/${session.user.id}_${Date.now()}.${fileExt}`;
+    const filePath = `${session.user.id}/withdrawal_proof_${Date.now()}.${fileExt}`;
 
     const { data: uploadData, error: uploadError } = await supabase
       .storage
@@ -179,6 +183,8 @@ async function loadProofs() {
     const res = await fetch('/api/finance?action=listWithdrawalProofs');
     const proofs = await res.json();
 
+    if (!res.ok) throw new Error(proofs.error || 'Failed to load proofs');
+
     if (!proofs || proofs.length === 0) {
       container.innerHTML = '<div class="card text-muted text-center">No community proofs uploaded yet. Be the first!</div>';
       return;
@@ -196,9 +202,10 @@ async function loadProofs() {
           </div>
 
           ${p.caption ? `<p style="margin-bottom:0.5rem;">${p.caption}</p>` : ''}
-          <a href="${p.display_url}" target="_blank">
-            <img src="${p.display_url}" class="proof-img" alt="Withdrawal Proof Screenshot">
-          </a>
+          ${p.display_url ? `
+            <a href="${p.display_url}" target="_blank">
+              <img src="${p.display_url}" class="proof-img" alt="Withdrawal Proof Screenshot">
+            </a>` : '<p class="text-muted">Image unavailable</p>'}
           <small class="text-muted">Posted on ${new Date(p.created_at).toLocaleDateString()}</small>
 
           <!-- Comment Feed -->
@@ -223,7 +230,7 @@ async function loadProofs() {
       `;
     }).join('');
   } catch (err) {
-    container.innerHTML = '<div class="card text-danger">Failed to load community proofs.</div>';
+    container.innerHTML = `<div class="card text-danger">Failed to load community proofs: ${err.message}</div>`;
   }
 }
 
