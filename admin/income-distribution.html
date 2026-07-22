@@ -36,7 +36,7 @@
     async function getToken() { return (await supabase.auth.getSession()).data.session?.access_token; }
     window.runNow = async () => {
       const token = await getToken();
-      const res = await fetch('/api/cron?action=triggerDailyIncome', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/investment?action=triggerDailyIncome', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         document.getElementById('result').innerHTML = '<div class="alert alert-success">Income distribution completed successfully.</div>';
       } else {
