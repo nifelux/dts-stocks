@@ -28,6 +28,62 @@ export default async function handler(req, res) {
         return await approveKYC(req, res);
       case 'rejectKYC':
         return await rejectKYC(req, res);
+      // Gift codes
+      case 'giftCodesList':
+        return await giftCodesList(req, res);
+      case 'createGiftCode':
+        return await createGiftCode(req, res);
+      case 'toggleGiftCode':
+        return await toggleGiftCode(req, res);
+      // Logs
+      case 'activityLogs':
+      case 'auditLogs':
+        return await activityLogs(req, res);
+      // Users
+      case 'users':
+        return await listUsers(req, res);
+      case 'freezeUser':
+        return await freezeUser(req, res, true);
+      case 'unfreezeUser':
+        return await freezeUser(req, res, false);
+      case 'banUser':
+        return await banUser(req, res, true);
+      case 'unbanUser':
+        return await banUser(req, res, false);
+      case 'creditWallet':
+        return await creditWallet(req, res);
+      case 'debitWallet':
+        return await debitWallet(req, res);
+      // Stats / reports
+      case 'stats':
+        return await getStats(req, res);
+      case 'exportCSV':
+        return await exportCSV(req, res);
+      // Settings (generic key/value — backs 9 different editor pages)
+      case 'settingsGet':
+        return await settingsGet(req, res);
+      case 'settingsUpdate':
+        return await settingsUpdate(req, res);
+      case 'maintenanceMode':
+        return await maintenanceMode(req, res);
+      // Roles
+      case 'listAdmins':
+        return await listAdmins(req, res);
+      case 'promoteAdmin':
+        return await promoteAdmin(req, res);
+      case 'demoteAdmin':
+        return await demoteAdmin(req, res);
+      // System health / telegram
+      case 'systemHealth':
+        return await systemHealth(req, res);
+      case 'telegramLogs':
+        return await telegramLogs(req, res);
+      // Notifications (admin-wide view)
+      case 'allNotifications':
+        return await allNotifications(req, res);
+      // VIP levels
+      case 'createVipLevel':
+        return await createVipLevel(req, res);
       default:
         return res.status(400).json({ error: `Invalid or missing admin action: '${action}'` });
     }
@@ -453,4 +509,317 @@ async function rejectKYC(req, res) {
 
   return res.status(200).json({ message: 'KYC rejected' });
 }
-  
+
+/* ============================================================
+   GIFT CODES
+   ============================================================ */
+async function giftCodesList(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin.from('gift_codes').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function createGiftCode(req, res) {
+  await verifyAdmin(req);
+  const { code, amount, max_uses } = req.body;
+  if (!code || !amount) return res.status(400).json({ error: 'Code and amount are required' });
+
+  const { data, error } = await supabaseAdmin.from('gift_codes').insert({
+    code: code.trim().toUpperCase(),
+    amount: Number(amount),
+    max_uses: Number(max_uses) || 1,
+    current_uses: 0,
+    is_active: true
+  }).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function toggleGiftCode(req, res) {
+  await verifyAdmin(req);
+  const { id } = req.body;
+  const { data: code } = await supabaseAdmin.from('gift_codes').select('is_active').eq('id', id).single();
+  if (!code) return res.status(404).json({ error: 'Gift code not found' });
+  await supabaseAdmin.from('gift_codes').update({ is_active: !code.is_active }).eq('id', id);
+  return res.status(200).json({ message: `Gift code ${code.is_active ? 'deactivated' : 'reactivated'}` });
+}
+
+/* ============================================================
+   LOGS
+   ============================================================ */
+// Both "Activity" and "Audit" log views in the admin UI currently read
+// from the same activity_logs table — there is only one log table in
+// the system today, so this intentionally serves both.
+async function activityLogs(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin
+    .from('activity_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+/* ============================================================
+   USERS
+   ============================================================ */
+async function listUsers(req, res) {
+  await verifyAdmin(req);
+  const page = Number(req.query.page) || 0;
+  const limit = Number(req.query.limit) || 15;
+  const search = (req.query.search || '').trim();
+
+  let query = supabaseAdmin
+    .from('profiles')
+    .select('id, full_name, email, vip_level, is_banned, is_frozen, wallets(balance)', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(page * limit, page * limit + limit - 1);
+
+  if (search) {
+    query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+  }
+
+  const { data, count, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ data, count });
+}
+
+async function freezeUser(req, res, freeze) {
+  const admin = await verifyAdmin(req);
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  await supabaseAdmin.from('profiles').update({ is_frozen: freeze }).eq('id', user_id);
+  await supabaseAdmin.from('activity_logs').insert({
+    user_id: admin.id, action: freeze ? 'admin_freeze_user' : 'admin_unfreeze_user', details: { target_user: user_id }
+  });
+  return res.status(200).json({ message: `User ${freeze ? 'frozen' : 'unfrozen'}` });
+}
+
+async function banUser(req, res, ban) {
+  const admin = await verifyAdmin(req);
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  await supabaseAdmin.from('profiles').update({ is_banned: ban }).eq('id', user_id);
+  await supabaseAdmin.from('activity_logs').insert({
+    user_id: admin.id, action: ban ? 'admin_ban_user' : 'admin_unban_user', details: { target_user: user_id }
+  });
+  return res.status(200).json({ message: `User ${ban ? 'banned' : 'unbanned'}` });
+}
+
+// Credit/debit go through a real transaction row (type: 'admin_credit' /
+// 'admin_debit', status: 'approved') so trg_process_transaction is the
+// one thing that ever touches wallets.balance — same reasoning as the
+// double-debit fix elsewhere in this codebase. Never update the wallet
+// balance directly here.
+async function creditWallet(req, res) {
+  const admin = await verifyAdmin(req);
+  const { user_id, amount, note } = req.body;
+  if (!user_id || !amount || Number(amount) <= 0) return res.status(400).json({ error: 'user_id and a positive amount are required' });
+
+  const { error } = await supabaseAdmin.from('transactions').insert({
+    user_id, type: 'admin_credit', amount: Number(amount), status: 'approved',
+    reference: `admincr_${Date.now()}_${user_id.substring(0, 8)}`,
+    meta: { note: note || null, admin_id: admin.id }
+  });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json({ message: 'Wallet credited' });
+}
+
+async function debitWallet(req, res) {
+  const admin = await verifyAdmin(req);
+  const { user_id, amount, note } = req.body;
+  if (!user_id || !amount || Number(amount) <= 0) return res.status(400).json({ error: 'user_id and a positive amount are required' });
+
+  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
+  if (!wallet || Number(wallet.balance) < Number(amount)) {
+    return res.status(400).json({ error: 'User has insufficient balance for this debit' });
+  }
+
+  const { error } = await supabaseAdmin.from('transactions').insert({
+    user_id, type: 'admin_debit', amount: Number(amount), status: 'approved',
+    reference: `admindb_${Date.now()}_${user_id.substring(0, 8)}`,
+    meta: { note: note || null, admin_id: admin.id }
+  });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json({ message: 'Wallet debited' });
+}
+
+/* ============================================================
+   STATS / REPORTS
+   ============================================================ */
+async function getStats(req, res) {
+  await verifyAdmin(req);
+  const [users, deposits, withdrawals, investments] = await Promise.all([
+    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
+    supabaseAdmin.from('deposits').select('amount').eq('status', 'approved'),
+    supabaseAdmin.from('withdrawals').select('amount').eq('status', 'approved'),
+    supabaseAdmin.from('investments').select('amount, status')
+  ]);
+
+  const totalDeposits = (deposits.data || []).reduce((s, d) => s + Number(d.amount), 0);
+  const totalWithdrawals = (withdrawals.data || []).reduce((s, w) => s + Number(w.amount), 0);
+  const investmentRows = investments.data || [];
+  const totalInvestments = investmentRows.reduce((s, i) => s + Number(i.amount), 0);
+  const activeInvestments = investmentRows.filter(i => i.status === 'active').length;
+
+  return res.status(200).json({
+    totalUsers: users.count || 0,
+    totalDeposits,
+    totalWithdrawals,
+    totalInvestments,
+    activeInvestments
+  });
+}
+
+// Simple CSV export for the four tables Reports links to. Streams a
+// flat CSV of whatever columns come back from a plain select — good
+// enough for an admin download, not meant to be a general-purpose
+// report builder.
+async function exportCSV(req, res) {
+  await verifyAdmin(req);
+  const { table } = req.query;
+  const allowedTables = ['transactions', 'deposits', 'withdrawals', 'users'];
+  if (!allowedTables.includes(table)) return res.status(400).json({ error: 'Invalid table' });
+
+  const sourceTable = table === 'users' ? 'profiles' : table;
+  const { data, error } = await supabaseAdmin.from(sourceTable).select('*').order('created_at', { ascending: false }).limit(5000);
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data || data.length === 0) {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${table}.csv"`);
+    return res.status(200).send('');
+  }
+
+  const headers = Object.keys(data[0]);
+  const escapeCsv = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers.join(','), ...data.map(row => headers.map(h => escapeCsv(row[h])).join(','))].join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${table}.csv"`);
+  return res.status(200).send(csv);
+}
+
+/* ============================================================
+   SETTINGS (generic key/value — backs 9 different editor pages)
+   ============================================================ */
+async function settingsGet(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin.from('settings').select('*');
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function settingsUpdate(req, res) {
+  await verifyAdmin(req);
+  const { key, value } = req.body;
+  if (!key) return res.status(400).json({ error: 'key is required' });
+
+  const { error } = await supabaseAdmin.from('settings').upsert({ key, value, updated_at: new Date() });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json({ message: 'Setting saved' });
+}
+
+// Stored as the literal string 'true'/'false' (not a JSON boolean) to
+// match what settings.html and maintenance.html already check for
+// (`mm === 'true'`) — changing the representation would silently break
+// both pages' maintenance-mode toggle display.
+async function maintenanceMode(req, res) {
+  await verifyAdmin(req);
+  const { enabled } = req.body;
+  const { error } = await supabaseAdmin.from('settings').upsert({
+    key: 'maintenance_mode', value: enabled ? 'true' : 'false', updated_at: new Date()
+  });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json({ message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}` });
+}
+
+/* ============================================================
+   ROLES
+   ============================================================ */
+async function listAdmins(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin.from('profiles').select('id, email, full_name').eq('is_admin', true);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+async function promoteAdmin(req, res) {
+  await verifyAdmin(req);
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+
+  const { data: target } = await supabaseAdmin.from('profiles').select('id').eq('id', user_id).single();
+  if (!target) return res.status(404).json({ error: 'No user found with that ID' });
+
+  await supabaseAdmin.from('profiles').update({ is_admin: true }).eq('id', user_id);
+  return res.status(200).json({ message: 'User promoted to admin' });
+}
+
+async function demoteAdmin(req, res) {
+  const admin = await verifyAdmin(req);
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'user_id is required' });
+  // Guard against an admin locking themselves (and everyone else) out
+  // by demoting the last remaining admin account.
+  if (user_id === admin.id) {
+    const { count } = await supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_admin', true);
+    if ((count || 0) <= 1) return res.status(400).json({ error: 'Cannot remove the last remaining admin' });
+  }
+  await supabaseAdmin.from('profiles').update({ is_admin: false }).eq('id', user_id);
+  return res.status(200).json({ message: 'Admin access removed' });
+}
+
+/* ============================================================
+   SYSTEM HEALTH / TELEGRAM
+   ============================================================ */
+async function systemHealth(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin.from('cron_logs').select('*').order('created_at', { ascending: false }).limit(1);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ dbOk: true, lastCron: data?.[0] || null });
+}
+
+async function telegramLogs(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin.from('telegram_logs').select('*').order('created_at', { ascending: false }).limit(20);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+/* ============================================================
+   NOTIFICATIONS (admin-wide view)
+   ============================================================ */
+async function allNotifications(req, res) {
+  await verifyAdmin(req);
+  const { data, error } = await supabaseAdmin
+    .from('notifications')
+    .select('*, profiles(email)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json(data);
+}
+
+/* ============================================================
+   VIP LEVELS
+   ============================================================ */
+async function createVipLevel(req, res) {
+  await verifyAdmin(req);
+  const { level, min_deposit, min_investments, min_referrals, daily_bonus_percent } = req.body;
+  if (!level) return res.status(400).json({ error: 'level is required' });
+
+  const { data, error } = await supabaseAdmin.from('vip_levels').insert({
+    level, min_deposit: Number(min_deposit) || 0, min_investments: Number(min_investments) || 0,
+    min_referrals: Number(min_referrals) || 0, daily_bonus_percent: Number(daily_bonus_percent) || 0
+  }).select().single();
+  if (error) return res.status(400).json({ error: error.message });
+  return res.status(200).json(data);
+}
