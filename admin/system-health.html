@@ -33,9 +33,11 @@
     const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
     (async () => {
       try {
-        const { data, error } = await supabase.from('cron_logs').select('*').order('created_at', { ascending: false }).limit(1);
-        if (error) throw error;
-        const last = data[0];
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        const res = await fetch('/api/admin?action=systemHealth', { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load system health');
+        const last = data.lastCron;
         document.getElementById('health-status').innerHTML = `
           <div class="card"><h4>Database Connection</h4><p class="text-success">OK</p></div>
           <div class="card mt-2"><h4>Last Cron Job</h4><p>${last ? `${last.job_name} – ${last.status} (${new Date(last.created_at).toLocaleString()})` : 'No runs yet'}</p></div>
