@@ -1054,3 +1054,65 @@ body.has-tab-bar{padding-bottom:88px}
 .history-card-figures{display:flex;gap:1.5rem;flex-wrap:wrap}
 .history-card-figure .value{font-family:var(--font-display);font-weight:600;font-size:1.05rem;color:var(--clr-purple-ink)}
 .history-card-figure .label{font-size:0.72rem;color:var(--clr-text-secondary)}
+
+/* ============================================================
+   GIFT CODES — voucher-style redeem card
+   ============================================================ */
+.giftcode-hero{
+  background:var(--gradient-gold);border-radius:var(--radius-lg);
+  padding:2rem 1.5rem;text-align:center;position:relative;overflow:hidden;
+}
+.giftcode-hero-icon{
+  width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,0.5);color:#7a5b00;
+  display:flex;align-items:center;justify-content:center;margin:0 auto 0.9rem;
+}
+.giftcode-hero-icon svg{width:26px;height:26px}
+.giftcode-hero h3{font-family:var(--font-display);font-weight:600;color:#2b1d00;margin-bottom:0.25rem}
+.giftcode-hero p{color:#5c4400;margin:0;font-size:0.88rem}
+
+.giftcode-voucher{
+  background:var(--clr-card);border:1.5px dashed var(--clr-border);border-radius:var(--radius-lg);
+  padding:1.5rem;margin-top:1.25rem;position:relative;
+}
+.giftcode-voucher::before,.giftcode-voucher::after{
+  content:'';position:absolute;top:50%;transform:translateY(-50%);
+  width:22px;height:22px;border-radius:50%;background:var(--clr-bg);
+}
+.giftcode-voucher::before{left:-11px}
+.giftcode-voucher::after{right:-11px}
+.giftcode-input{
+  text-transform:uppercase;letter-spacing:0.08em;font-family:var(--font-display);
+  font-weight:600;font-size:1.15rem;text-align:center;
+}
+
+/* ============================================================
+   MESSAGES — notification rows
+   ============================================================ */
+.notification-row{
+  display:flex;gap:0.85rem;padding:1rem 0;border-bottom:1px solid var(--clr-border);
+}
+.notification-row:last-child{border-bottom:none}
+.notification-icon{
+  flex-shrink:0;width:38px;height:38px;border-radius:50%;background:#EDE7FF;color:var(--clr-purple-deep);
+  display:flex;align-items:center;justify-content:center;position:relative;
+}
+.notification-icon svg{width:17px;height:17px}
+.notification-unread-dot{
+  position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;
+  background:var(--clr-danger);border:2px solid var(--clr-card);
+}
+.notification-body{flex:1;min-width:0}
+.notification-title{font-weight:600;margin-bottom:0.15rem}
+.notification-text{font-size:0.88rem;color:var(--clr-text-secondary);margin-bottom:0.2rem}
+.notification-date{font-size:0.74rem;color:var(--clr-text-secondary)}
+
+/* ============================================================
+   SUPPORT — ticket rows
+   ============================================================ */
+.ticket-row{
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:1rem 0;border-bottom:1px solid var(--clr-border);
+}
+.ticket-row:last-child{border-bottom:none}
+.ticket-subject{font-weight:600;margin-bottom:0.15rem}
+.ticket-date{font-size:0.78rem;color:var(--clr-text-secondary)}
