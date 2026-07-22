@@ -137,6 +137,23 @@
     </div>
   </div>
 
+  <!-- Welcome modal — shown once per day, links out to Telegram -->
+  <div class="modal-overlay" id="welcome-modal">
+    <div class="modal-content text-center">
+      <div class="welcome-icon" style="margin:0 auto 1rem;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+      </div>
+      <h2 style="font-family:var(--font-display);font-weight:600;color:var(--clr-purple-ink);margin-bottom:0.5rem;">Welcome to DTL Stocks!</h2>
+      <p class="text-muted">Stay in the loop and get support faster by joining us on Telegram.</p>
+      <div class="flex" style="flex-direction:column;gap:0.6rem;margin-top:1.25rem;">
+        <a href="https://t.me/YOUR_CHANNEL" target="_blank" rel="noopener" class="btn btn-primary btn-block">Join our Telegram Channel</a>
+        <a href="https://t.me/YOUR_COMMUNITY" target="_blank" rel="noopener" class="btn btn-outline btn-block">Join our Telegram Community</a>
+        <a href="https://t.me/YOUR_SUPPORT" target="_blank" rel="noopener" class="btn btn-outline btn-block">Chat with Customer Service</a>
+      </div>
+      <button type="button" id="welcome-modal-dismiss" class="btn btn-outline btn-block mt-2">Maybe later</button>
+    </div>
+  </div>
+
   <div id="footer-container"></div>
   <script src="/assets/js/components.js"></script>
   <script type="module">
@@ -294,6 +311,22 @@
     }
 
     checkAuth().then(user => loadDashboard(user));
+
+    // Show the welcome modal once per calendar day, not on every visit.
+    (function initWelcomeModal() {
+      const modal = document.getElementById('welcome-modal');
+      const todayKey = new Date().toISOString().slice(0, 10);
+      if (localStorage.getItem('welcome_modal_last_shown') !== todayKey) {
+        modal.classList.add('active');
+      }
+      function dismiss() {
+        modal.classList.remove('active');
+        localStorage.setItem('welcome_modal_last_shown', todayKey);
+      }
+      document.getElementById('welcome-modal-dismiss').addEventListener('click', dismiss);
+      modal.addEventListener('click', (e) => { if (e.target === modal) dismiss(); });
+      modal.querySelectorAll('a').forEach(a => a.addEventListener('click', dismiss));
+    })();
   </script>
 </body>
 </html>
