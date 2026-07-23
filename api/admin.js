@@ -401,10 +401,13 @@ async function giftCodesList(req, res) {
   return res.status(200).json(data);
 }
 
-async function createGiftCode(req, res) {
-  await verifyAdmin(req);
-  const { code, amount, max_uses } = req.body;
-  if (!code || !amount) return res.status(400).json({ error: 'Code and amount are required' });
+/**
+ * Core logic, extracted so the Telegram bot (/giftcode) can call this
+ * directly in-process — same reasoning as the approve/reject and purge
+ * refactors: one code path, no HTTP self-call, no duplicated logic.
+ */
+export async function createGiftCodeCore(code, amount, max_uses) {
+  if (!code || !amount) return { ok: false, error: 'Code and amount are required' };
 
   const { data, error } = await supabaseAdmin.from('gift_codes').insert({
     code: code.trim().toUpperCase(),
@@ -413,8 +416,23 @@ async function createGiftCode(req, res) {
     current_uses: 0,
     is_active: true
   }).select().single();
-  if (error) return res.status(400).json({ error: error.message });
-  return res.status(200).json(data);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, record: data };
+}
+
+function generateRandomGiftCode(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I — easy to misread
+  let code = '';
+  for (let i = 0; i < length; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+export { generateRandomGiftCode };
+
+async function createGiftCode(req, res) {
+  await verifyAdmin(req);
+  const { code, amount, max_uses } = req.body;
+  const result = await createGiftCodeCore(code, amount, max_uses);
+  return res.status(result.ok ? 200 : 400).json(result.ok ? result.record : { error: result.error });
 }
 
 async function toggleGiftCode(req, res) {
