@@ -5,54 +5,663 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard – DTL Stocks</title>
   <link rel="stylesheet" href="../assets/css/style.css">
+  <style>
+    .admin-view{display:none}
+    .admin-view.is-active{display:block}
+    .sidebar-divider{padding:0.75rem 1rem 0.35rem; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--clr-text-secondary); opacity:0.7;}
+    .sidebar-nav a[data-view]{cursor:pointer}
+  </style>
 </head>
 <body>
   <nav class="navbar"><div class="logo"><strong>Admin Panel</strong></div><a href="../dashboard.html">User Site</a></nav>
   <div class="flex">
     <aside class="sidebar">
+      <ul class="sidebar-nav" id="sidebar-nav">
+        <li><a href="#dashboard" data-view="dashboard" class="active">Dashboard</a></li>
+        <li><a href="#users" data-view="users">Users</a></li>
+        <li><a href="#deposits" data-view="deposits">Deposits</a></li>
+        <li><a href="#withdrawals" data-view="withdrawals">Withdrawals</a></li>
+        <li><a href="#products" data-view="products">Products</a></li>
+        <li><a href="#gift-codes" data-view="gift-codes">Gift Codes</a></li>
+        <li><a href="#support" data-view="support">Support</a></li>
+        <li><a href="#kyc" data-view="kyc">KYC</a></li>
+        <li><a href="#logs" data-view="logs">Logs</a></li>
+      </ul>
+      <div class="sidebar-divider">More (separate pages, not yet merged)</div>
       <ul class="sidebar-nav">
-        <li><a href="index.html" class="active">Dashboard</a></li>
-        <li><a href="users.html">Users</a></li>
-        <li><a href="deposits.html">Deposits</a></li>
-        <li><a href="withdrawals.html">Withdrawals</a></li>
-        <li><a href="investments.html">Investments</a></li>
-        <li><a href="products.html">Products</a></li>
-        <li><a href="vip.html">VIP</a></li>
-        <li><a href="gift-codes.html">Gift Codes</a></li>
-        <li><a href="support.html">Support</a></li>
-        <li><a href="kyc.html">KYC</a></li>
         <li><a href="reports.html">Reports</a></li>
         <li><a href="settings.html">Settings</a></li>
-        <li><a href="logs.html">Logs</a></li>
+        <li><a href="vip.html">VIP</a></li>
+        <li><a href="roles.html">Roles</a></li>
+        <li><a href="referral-management.html">Referral Management</a></li>
+        <li><a href="website-editor.html">Website Editor</a></li>
+        <li><a href="maintenance.html">Maintenance</a></li>
+        <li><a href="monnify-settings.html">Monnify Settings</a></li>
+        <li><a href="cron-monitor.html">Cron Monitor</a></li>
+        <li><a href="income-distribution.html">Income Distribution</a></li>
+        <li><a href="system-health.html">System Health</a></li>
+        <li><a href="telegram.html">Telegram</a></li>
+        <li><a href="messages.html">Messages</a></li>
+        <li><a href="notifications.html">Notifications</a></li>
+        <li><a href="backup.html">Backup</a></li>
       </ul>
     </aside>
+
     <main style="flex:1; padding:2rem;">
-      <h2>Overview</h2>
-      <div class="widget-grid" id="stats"></div>
+
+      <!-- ============ DASHBOARD ============ -->
+      <section class="admin-view is-active" id="view-dashboard">
+        <h2>Overview</h2>
+        <div class="widget-grid" id="stats">Loading…</div>
+      </section>
+
+      <!-- ============ USERS ============ -->
+      <section class="admin-view" id="view-users">
+        <h2>Users</h2>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="user-search" class="form-input" placeholder="Search by name or email" style="flex:1">
+          <button class="btn btn-primary" id="user-search-btn">Search</button>
+        </div>
+        <table id="users-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Balance</th><th>VIP</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="flex gap-2 mt-2" id="users-pagination"></div>
+        <div class="modal-overlay" id="action-modal">
+          <div class="modal-content">
+            <h3 id="modal-title"></h3>
+            <div id="modal-body"></div>
+            <button class="btn btn-primary mt-2" id="modal-close-btn">Close</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ DEPOSITS ============ -->
+      <section class="admin-view" id="view-deposits">
+        <h2>Deposits</h2>
+        <div class="flex gap-2 mb-2">
+          <select id="deposit-status-filter" class="form-select">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="btn btn-primary" id="deposit-load-btn">Load</button>
+        </div>
+        <table id="deposits-table">
+          <thead><tr><th>User ID</th><th>Amount</th><th>Method</th><th>Sender Name & Bank</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- ============ WITHDRAWALS ============ -->
+      <section class="admin-view" id="view-withdrawals">
+        <h2>Manual Withdrawal Management</h2>
+        <p class="text-muted mb-2">Review pending requests, send the bank transfer manually, then click Approve to complete.</p>
+        <div class="flex gap-2 mb-2">
+          <select id="wd-status-filter" class="form-select">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved (Paid)</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="btn btn-primary" id="wd-load-btn">Load</button>
+        </div>
+        <div id="wd-error-alert" class="alert alert-danger" style="display:none;"></div>
+        <table id="withdrawals-table" class="table">
+          <thead><tr><th>User</th><th>Amount</th><th>Bank Details</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- ============ PRODUCTS ============ -->
+      <section class="admin-view" id="view-products">
+        <h2>Investment Products</h2>
+        <div id="product-form-error" class="alert alert-danger" style="display:none;"></div>
+        <form id="product-form" class="card mb-2">
+          <h3 class="mb-2" id="product-form-title">New Product</h3>
+          <input type="hidden" id="product-id">
+          <div class="form-group"><input id="product-name" class="form-input" placeholder="Product name (e.g. Starter Plan)" required></div>
+          <div class="form-group"><textarea id="product-description" class="form-textarea" placeholder="Short description"></textarea></div>
+          <div class="flex gap-2">
+            <div class="form-group" style="flex:1;"><input id="product-price" type="number" min="1" step="0.01" class="form-input" placeholder="Price (₦)" required></div>
+            <div class="form-group" style="flex:1;"><input id="product-daily-income" type="number" min="1" step="0.01" class="form-input" placeholder="Daily income (₦)" required></div>
+          </div>
+          <div class="flex gap-2">
+            <div class="form-group" style="flex:1;"><input id="product-duration" type="number" min="1" class="form-input" placeholder="Duration (days)" required></div>
+            <div class="form-group" style="flex:1;"><input id="product-max-purchases" type="number" min="1" class="form-input" placeholder="Max purchases per user" value="2"></div>
+          </div>
+          <button id="product-submit-btn" class="btn btn-primary">Save Product</button>
+          <button type="button" id="product-cancel-btn" class="btn btn-outline" style="display:none;">Cancel</button>
+        </form>
+        <table id="products-table">
+          <thead><tr><th>Name</th><th>Price</th><th>Daily Income</th><th>Duration</th><th>Purchase Limit</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+        </table>
+      </section>
+
+      <!-- ============ GIFT CODES ============ -->
+      <section class="admin-view" id="view-gift-codes">
+        <h2>Gift Codes</h2>
+        <div id="gift-form-error" class="alert alert-danger" style="display:none;"></div>
+        <form id="gift-form" class="card mb-2">
+          <div class="form-group"><input id="gift-code" class="form-input" placeholder="Code (e.g. WELCOME2026)" required></div>
+          <div class="form-group"><input id="gift-amount" type="number" min="1" step="0.01" class="form-input" placeholder="Amount (₦)" required></div>
+          <div class="form-group"><input id="gift-max-uses" type="number" min="1" class="form-input" placeholder="Max Uses" value="1"></div>
+          <button id="gift-submit-btn" class="btn btn-primary">Create Gift Code</button>
+        </form>
+        <table id="gift-table"><thead><tr><th>Code</th><th>Amount</th><th>Used</th><th>Status</th><th>Actions</th></tr></thead><tbody><tr><td colspan="5">Loading…</td></tr></tbody></table>
+      </section>
+
+      <!-- ============ SUPPORT ============ -->
+      <section class="admin-view" id="view-support">
+        <h2>Support Tickets</h2>
+        <div id="tickets">Loading…</div>
+      </section>
+
+      <!-- ============ KYC ============ -->
+      <section class="admin-view" id="view-kyc">
+        <h2>KYC Documents</h2>
+        <div id="kyc-docs">Loading…</div>
+      </section>
+
+      <!-- ============ LOGS ============ -->
+      <section class="admin-view" id="view-logs">
+        <h2>Activity &amp; Audit Logs</h2>
+        <div class="flex gap-2 mb-2">
+          <select id="log-type" class="form-select">
+            <option value="activity">Activity Logs</option>
+            <option value="audit">Audit Logs</option>
+          </select>
+          <button class="btn btn-primary" id="log-load-btn">Load</button>
+        </div>
+        <div id="log-entries"></div>
+      </section>
+
     </main>
   </div>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-    const supabase = createClient('https://jytmnukzvxirnafukbck.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw');
+    const supabase = createClient(
+      'https://jytmnukzvxirnafukbck.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dG1udWt6dnhpcm5hZnVrYmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNjQ3MjUsImV4cCI6MjA5OTc0MDcyNX0.ZvGUPTW7dJ3UxL2N1TW0lBCe3H4559HaUEhks7vEbEw'
+    );
+    window.supabase = supabase;
+
+    // ============================================================
+    // Shared helpers
+    // ============================================================
+    async function getToken() {
+      return (await supabase.auth.getSession()).data.session?.access_token;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
+    }
+
+    async function apiCall(base, action, options = {}) {
+      const token = await getToken();
+      const res = await fetch(`/api/${base}?action=${action}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
     async function checkAdmin() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return window.location.href = '../login.html';
+      if (!user) { window.location.href = '../login.html'; return null; }
       const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
-      if (!profile?.is_admin) return window.location.href = '../dashboard.html';
+      if (!profile?.is_admin) { window.location.href = '../dashboard.html'; return null; }
       return user;
     }
-    (async () => {
-      await checkAdmin();
-      // Fetch stats via admin API
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const res = await fetch('/api/admin?action=stats', { headers: { Authorization: `Bearer ${token}` } });
-      const stats = await res.json();
-      document.getElementById('stats').innerHTML = `
-        <div class="card stat-card"><div class="stat-value">${stats.totalUsers}</div><div class="stat-label">Total Users</div></div>
-        <div class="card stat-card"><div class="stat-value">₦${(stats.totalDeposits||0).toLocaleString()}</div><div class="stat-label">Total Deposits</div></div>
-        <div class="card stat-card"><div class="stat-value">₦${(stats.totalWithdrawals||0).toLocaleString()}</div><div class="stat-label">Total Withdrawals</div></div>
-        <div class="card stat-card"><div class="stat-value">${stats.activeInvestments||0}</div><div class="stat-label">Active Investments</div></div>
+
+    // ============================================================
+    // View router — hash-based, no page reloads between sections
+    // ============================================================
+    const VIEWS = ['dashboard', 'users', 'deposits', 'withdrawals', 'products', 'gift-codes', 'support', 'kyc', 'logs'];
+    const VIEW_LOADERS = {
+      dashboard: loadDashboard,
+      users: () => loadUsers(),
+      deposits: loadDeposits,
+      withdrawals: loadWithdrawals,
+      products: loadProducts,
+      'gift-codes': loadGiftCodes,
+      support: loadSupportTickets,
+      kyc: loadKycDocs,
+      logs: loadLogs
+    };
+
+    function showView(view) {
+      if (!VIEWS.includes(view)) view = 'dashboard';
+      document.querySelectorAll('.admin-view').forEach(el => el.classList.remove('is-active'));
+      document.getElementById(`view-${view}`)?.classList.add('is-active');
+      document.querySelectorAll('#sidebar-nav a[data-view]').forEach(a => {
+        a.classList.toggle('active', a.dataset.view === view);
+      });
+      VIEW_LOADERS[view]?.();
+    }
+
+    document.getElementById('sidebar-nav').addEventListener('click', (e) => {
+      const link = e.target.closest('a[data-view]');
+      if (!link) return;
+      e.preventDefault();
+      window.location.hash = link.dataset.view;
+    });
+    window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+
+    // ============================================================
+    // Dashboard
+    // ============================================================
+    async function loadDashboard() {
+      const el = document.getElementById('stats');
+      const data = await apiCall('admin', 'stats');
+      el.innerHTML = `
+        <div class="card stat-card"><div class="stat-value">${data.totalUsers}</div><div class="stat-label">Total Users</div></div>
+        <div class="card stat-card"><div class="stat-value">₦${(data.totalDeposits||0).toLocaleString()}</div><div class="stat-label">Total Deposits</div></div>
+        <div class="card stat-card"><div class="stat-value">₦${(data.totalWithdrawals||0).toLocaleString()}</div><div class="stat-label">Total Withdrawals</div></div>
+        <div class="card stat-card"><div class="stat-value">${data.activeInvestments||0}</div><div class="stat-label">Active Investments</div></div>
       `;
+    }
+
+    // ============================================================
+    // Users
+    // ============================================================
+    let usersPage = 0;
+    async function loadUsers(search = '') {
+      const token = await getToken();
+      const res = await fetch(`/api/admin?action=users&page=${usersPage}&limit=15&search=${encodeURIComponent(search)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const { data, count } = await res.json();
+      const tbody = document.querySelector('#users-table tbody');
+      tbody.innerHTML = (data || []).map(u => `
+        <tr>
+          <td>${escapeHtml(u.full_name || 'N/A')}</td>
+          <td>${escapeHtml(u.email)}</td>
+          <td>₦${(u.wallets?.balance || 0).toLocaleString()}</td>
+          <td>${escapeHtml(u.vip_level)}</td>
+          <td>${u.is_banned ? '<span class="badge badge-danger">Banned</span>' : u.is_frozen ? '<span class="badge badge-warning">Frozen</span>' : '<span class="badge badge-success">Active</span>'}</td>
+          <td class="flex gap-1">
+            <button class="btn btn-sm btn-outline" data-freeze="${u.id}" data-frozen="${u.is_frozen}">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button>
+            <button class="btn btn-sm btn-danger" data-ban="${u.id}" data-banned="${u.is_banned}">${u.is_banned ? 'Unban' : 'Ban'}</button>
+            <button class="btn btn-sm btn-outline" data-creditdebit="${u.id}">C/D</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('users-pagination').innerHTML = `
+        <button class="btn btn-sm" ${usersPage === 0 ? 'disabled' : ''} id="users-prev">Prev</button>
+        <span>Page ${usersPage + 1}</span>
+        <button class="btn btn-sm" ${((data || []).length < 15) ? 'disabled' : ''} id="users-next">Next</button>
+      `;
+    }
+    document.getElementById('user-search-btn').addEventListener('click', () => { usersPage = 0; loadUsers(document.getElementById('user-search').value); });
+    document.querySelector('#view-users').addEventListener('click', async (e) => {
+      if (e.target.id === 'users-prev' && usersPage > 0) { usersPage--; loadUsers(document.getElementById('user-search').value); }
+      if (e.target.id === 'users-next') { usersPage++; loadUsers(document.getElementById('user-search').value); }
+      if (e.target.id === 'modal-close-btn') document.getElementById('action-modal').classList.remove('active');
+
+      const freezeId = e.target.dataset.freeze;
+      const banId = e.target.dataset.ban;
+      const cdId = e.target.dataset.creditdebit;
+
+      if (freezeId) {
+        const action = e.target.dataset.frozen === 'true' ? 'unfreezeUser' : 'freezeUser';
+        await apiCall('admin', action, { method: 'POST', body: JSON.stringify({ user_id: freezeId }) });
+        loadUsers(document.getElementById('user-search').value);
+      }
+      if (banId) {
+        const action = e.target.dataset.banned === 'true' ? 'unbanUser' : 'banUser';
+        await apiCall('admin', action, { method: 'POST', body: JSON.stringify({ user_id: banId }) });
+        loadUsers(document.getElementById('user-search').value);
+      }
+      if (cdId) {
+        document.getElementById('modal-title').textContent = 'Credit / Debit Wallet';
+        document.getElementById('modal-body').innerHTML = `
+          <div class="form-group"><label>Amount (₦)</label><input id="cd-amount" class="form-input" type="number"></div>
+          <div class="form-group"><label>Note</label><input id="cd-note" class="form-input"></div>
+          <button class="btn btn-success" id="cd-credit-btn">Credit</button>
+          <button class="btn btn-danger" id="cd-debit-btn">Debit</button>
+        `;
+        document.getElementById('action-modal').classList.add('active');
+        document.getElementById('cd-credit-btn').onclick = async () => {
+          await apiCall('admin', 'creditWallet', { method: 'POST', body: JSON.stringify({ user_id: cdId, amount: +document.getElementById('cd-amount').value, note: document.getElementById('cd-note').value }) });
+          document.getElementById('action-modal').classList.remove('active');
+          loadUsers(document.getElementById('user-search').value);
+        };
+        document.getElementById('cd-debit-btn').onclick = async () => {
+          await apiCall('admin', 'debitWallet', { method: 'POST', body: JSON.stringify({ user_id: cdId, amount: +document.getElementById('cd-amount').value, note: document.getElementById('cd-note').value }) });
+          document.getElementById('action-modal').classList.remove('active');
+          loadUsers(document.getElementById('user-search').value);
+        };
+      }
+    });
+
+    // ============================================================
+    // Deposits
+    // ============================================================
+    async function loadDeposits() {
+      const status = document.getElementById('deposit-status-filter').value;
+      const data = await apiCall('admin', `depositsList&status=${status}`);
+      const tbody = document.querySelector('#deposits-table tbody');
+      const rows = data.deposits || [];
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">No deposit records found.</td></tr>'; return; }
+      tbody.innerHTML = rows.map(d => `
+        <tr>
+          <td>${d.user_id?.slice(0, 8)}</td>
+          <td>₦${Number(d.amount).toLocaleString()}</td>
+          <td>${escapeHtml(d.payment_method || 'bank_transfer')}</td>
+          <td>${escapeHtml(d.payment_details || d.proof_image_url || 'N/A')}</td>
+          <td><span class="badge">${escapeHtml(d.status)}</span></td>
+          <td>${d.status === 'pending' ? `
+            <button class="btn btn-sm btn-success" data-approve-dep="${d.id}">Approve</button>
+            <button class="btn btn-sm btn-danger" data-reject-dep="${d.id}">Reject</button>
+          ` : '-'}</td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('deposit-load-btn').addEventListener('click', loadDeposits);
+    document.querySelector('#view-deposits').addEventListener('click', async (e) => {
+      const approveId = e.target.dataset.approveDep;
+      const rejectId = e.target.dataset.rejectDep;
+      if (approveId) {
+        if (!confirm('Approve this deposit and credit user wallet?')) return;
+        await apiCall('admin', 'approveDeposit', { method: 'POST', body: JSON.stringify({ deposit_id: approveId }) });
+        loadDeposits();
+      }
+      if (rejectId) {
+        const reason = prompt('Reason for rejection:');
+        if (reason === null) return;
+        await apiCall('admin', 'rejectDeposit', { method: 'POST', body: JSON.stringify({ deposit_id: rejectId, admin_notes: reason }) });
+        loadDeposits();
+      }
+    });
+
+    // ============================================================
+    // Withdrawals
+    // ============================================================
+    function wdActionCell(w) {
+      if (w.status === 'pending') {
+        return `<button class="btn btn-sm btn-success" data-approve-wd="${w.id}">Mark as Paid</button>
+                <button class="btn btn-sm btn-danger" data-reject-wd="${w.id}">Reject & Refund</button>`;
+      }
+      if (w.status === 'approved') return '<span class="badge badge-success">Completed</span>';
+      if (w.status === 'rejected') return '<span class="badge badge-danger">Refunded</span>';
+      return '';
+    }
+    async function loadWithdrawals() {
+      const errEl = document.getElementById('wd-error-alert');
+      errEl.style.display = 'none';
+      const status = document.getElementById('wd-status-filter').value;
+      const token = await getToken();
+      const res = await fetch(`/api/admin?action=withdrawalsList&status=${status}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { errEl.textContent = data.error || 'Failed to load withdrawals'; errEl.style.display = 'block'; return; }
+      const tbody = document.querySelector('#withdrawals-table tbody');
+      const rows = data.withdrawals || [];
+      tbody.innerHTML = rows.map(w => {
+        const bank = w.bank_details || {};
+        return `
+          <tr>
+            <td><strong>${escapeHtml(w.profiles?.full_name || 'No Name')}</strong><br><small class="text-muted">${escapeHtml(w.profiles?.email || w.user_id?.slice(0, 8))}</small></td>
+            <td><strong>₦${Number(w.amount).toLocaleString()}</strong></td>
+            <td><strong>${escapeHtml(bank.bank_name || 'N/A')}</strong><br><code>${escapeHtml(bank.account_number || '')}</code> (${escapeHtml(bank.account_name || '')})</td>
+            <td><span class="badge badge-${w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'danger' : 'warning'}">${escapeHtml(w.status)}</span></td>
+            <td><small>${new Date(w.created_at).toLocaleDateString()}</small></td>
+            <td>${wdActionCell(w)}</td>
+          </tr>`;
+      }).join('') || '<tr><td colspan="6" class="text-muted">No withdrawals found in this status.</td></tr>';
+    }
+    document.getElementById('wd-load-btn').addEventListener('click', loadWithdrawals);
+    document.querySelector('#view-withdrawals').addEventListener('click', async (e) => {
+      const errEl = document.getElementById('wd-error-alert');
+      const approveId = e.target.dataset.approveWd;
+      const rejectId = e.target.dataset.rejectWd;
+      if (approveId) {
+        if (!confirm('Have you manually transferred this payment to the user?')) return;
+        errEl.style.display = 'none';
+        const token = await getToken();
+        const res = await fetch('/api/admin?action=approveWithdrawal', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ withdrawal_id: approveId }) });
+        const json = await res.json();
+        if (!res.ok) { errEl.textContent = json.error || 'Approve failed'; errEl.style.display = 'block'; return; }
+        loadWithdrawals();
+      }
+      if (rejectId) {
+        if (!confirm("Are you sure you want to reject this request? The funds will be refunded back to the user's wallet.")) return;
+        errEl.style.display = 'none';
+        const token = await getToken();
+        const res = await fetch('/api/admin?action=rejectWithdrawal', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ withdrawal_id: rejectId }) });
+        const json = await res.json();
+        if (!res.ok) { errEl.textContent = json.error || 'Reject failed'; errEl.style.display = 'block'; return; }
+        loadWithdrawals();
+      }
+    });
+
+    // ============================================================
+    // Products (goes through /api/investment, not /api/admin)
+    // ============================================================
+    async function loadProducts() {
+      const tbody = document.querySelector('#products-table tbody');
+      try {
+        const data = await apiCall('investment', 'products');
+        if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No products yet.</td></tr>'; return; }
+        tbody.innerHTML = data.map(p => `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>₦${Number(p.min_invest).toLocaleString()}</td>
+            <td>${p.daily_income_amount != null ? '₦' + Number(p.daily_income_amount).toLocaleString() + '/day' : p.daily_roi_percent + '%/day'}</td>
+            <td>${p.duration_days} days</td>
+            <td>${p.max_purchases_per_user ?? 'Unlimited'}</td>
+            <td>${p.is_locked ? '<span class="badge">Locked</span>' : '<span class="badge badge-success">Live</span>'}</td>
+            <td>
+              <button class="btn btn-sm btn-outline" data-edit-prod="${p.id}">Edit</button>
+              <button class="btn btn-sm ${p.is_locked ? 'btn-success' : 'btn-danger'}" data-toggle-prod="${p.id}" data-locked="${p.is_locked}">${p.is_locked ? 'Unlock' : 'Lock'}</button>
+            </td>
+          </tr>
+        `).join('');
+        window.__products = data;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+    document.querySelector('#products-table').addEventListener('click', async (e) => {
+      const editId = e.target.dataset.editProd;
+      const toggleId = e.target.dataset.toggleProd;
+      if (editId) {
+        const p = window.__products.find(x => x.id === editId);
+        document.getElementById('product-form-title').textContent = 'Edit Product';
+        document.getElementById('product-id').value = p.id;
+        document.getElementById('product-name').value = p.name;
+        document.getElementById('product-description').value = p.description || '';
+        document.getElementById('product-price').value = p.min_invest;
+        document.getElementById('product-daily-income').value = p.daily_income_amount ?? '';
+        document.getElementById('product-duration').value = p.duration_days;
+        document.getElementById('product-max-purchases').value = p.max_purchases_per_user ?? '';
+        document.getElementById('product-cancel-btn').style.display = 'inline-flex';
+        document.querySelector('#view-products').scrollIntoView({ behavior: 'smooth' });
+      }
+      if (toggleId) {
+        const p = window.__products.find(x => x.id === toggleId);
+        e.target.disabled = true;
+        try {
+          await apiCall('investment', 'toggleLock', { method: 'POST', body: JSON.stringify({ id: toggleId, is_locked: !p.is_locked }) });
+          loadProducts();
+        } catch (err) { alert(err.message); e.target.disabled = false; }
+      }
+    });
+    document.getElementById('product-cancel-btn').addEventListener('click', () => {
+      document.getElementById('product-form').reset();
+      document.getElementById('product-id').value = '';
+      document.getElementById('product-form-title').textContent = 'New Product';
+      document.getElementById('product-cancel-btn').style.display = 'none';
+    });
+    document.getElementById('product-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('product-form-error');
+      const submitBtn = document.getElementById('product-submit-btn');
+      errorBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+      const id = document.getElementById('product-id').value;
+      const payload = {
+        id: id || undefined,
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-description').value,
+        min_invest: +document.getElementById('product-price').value,
+        max_invest: +document.getElementById('product-price').value,
+        daily_income_amount: +document.getElementById('product-daily-income').value,
+        duration_days: +document.getElementById('product-duration').value,
+        max_purchases_per_user: document.getElementById('product-max-purchases').value ? +document.getElementById('product-max-purchases').value : null
+      };
+      try {
+        await apiCall('investment', id ? 'updateProduct' : 'createProduct', { method: 'POST', body: JSON.stringify(payload) });
+        document.getElementById('product-cancel-btn').click();
+        loadProducts();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Product';
+      }
+    });
+
+    // ============================================================
+    // Gift Codes
+    // ============================================================
+    async function loadGiftCodes() {
+      const tbody = document.querySelector('#gift-table tbody');
+      try {
+        const data = await apiCall('admin', 'giftCodesList');
+        if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No gift codes yet.</td></tr>'; return; }
+        tbody.innerHTML = data.map(g => `
+          <tr>
+            <td>${escapeHtml(g.code)}</td>
+            <td>₦${Number(g.amount).toLocaleString()}</td>
+            <td>${g.current_uses}/${g.max_uses}</td>
+            <td>${g.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge">Inactive</span>'}</td>
+            <td><button class="btn btn-sm ${g.is_active ? 'btn-danger' : 'btn-success'}" data-toggle-gift="${g.id}">${g.is_active ? 'Deactivate' : 'Reactivate'}</button></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+    document.querySelector('#gift-table tbody').addEventListener('click', async (e) => {
+      const id = e.target.dataset.toggleGift;
+      if (!id) return;
+      e.target.disabled = true;
+      try { await apiCall('admin', 'toggleGiftCode', { method: 'POST', body: JSON.stringify({ id }) }); loadGiftCodes(); }
+      catch (err) { alert(err.message); e.target.disabled = false; }
+    });
+    document.getElementById('gift-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('gift-form-error');
+      const submitBtn = document.getElementById('gift-submit-btn');
+      errorBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating…';
+      try {
+        await apiCall('admin', 'createGiftCode', {
+          method: 'POST',
+          body: JSON.stringify({
+            code: document.getElementById('gift-code').value,
+            amount: +document.getElementById('gift-amount').value,
+            max_uses: +document.getElementById('gift-max-uses').value || 1
+          })
+        });
+        e.target.reset();
+        document.getElementById('gift-max-uses').value = 1;
+        loadGiftCodes();
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Gift Code';
+      }
+    });
+
+    // ============================================================
+    // Support
+    // ============================================================
+    async function loadSupportTickets() {
+      const data = await apiCall('support', 'listAll');
+      document.getElementById('tickets').innerHTML = data.map(t => `
+        <div class="card mb-2">
+          <strong>${escapeHtml(t.subject)}</strong> (${escapeHtml(t.status)})
+          <p>${escapeHtml(t.message)}</p>
+          <textarea id="reply-${t.id}" class="form-textarea mb-1" placeholder="Reply..."></textarea>
+          <button class="btn btn-sm btn-primary" data-reply-ticket="${t.id}">Reply</button>
+        </div>
+      `).join('');
+    }
+    document.getElementById('tickets').addEventListener('click', async (e) => {
+      const ticketId = e.target.dataset.replyTicket;
+      if (!ticketId) return;
+      const msg = document.getElementById(`reply-${ticketId}`).value;
+      await apiCall('support', 'adminReply', { method: 'POST', body: JSON.stringify({ ticket_id: ticketId, message: msg }) });
+      loadSupportTickets();
+    });
+
+    // ============================================================
+    // KYC
+    // ============================================================
+    async function loadKycDocs() {
+      const docsEl = document.getElementById('kyc-docs');
+      try {
+        const data = await apiCall('admin', 'kycList');
+        if (!data || data.length === 0) { docsEl.innerHTML = 'No KYC documents to review.'; return; }
+        docsEl.innerHTML = data.map(d => `
+          <div class="card mb-2">
+            <p><strong>User:</strong> ${escapeHtml(d.profiles?.email || d.user_id.slice(0, 8))} | <strong>Type:</strong> ${escapeHtml(d.doc_type)} | <strong>Status:</strong> ${escapeHtml(d.status)}</p>
+            ${d.signedUrl ? `<img src="${d.signedUrl}" style="max-width:200px; border-radius:8px;" alt="${escapeHtml(d.doc_type)}">` : '<p class="text-muted">Preview unavailable</p>'}
+            ${d.status === 'pending' ? `
+              <div class="flex gap-1 mt-1">
+                <button class="btn btn-sm btn-success" data-approve-kyc="${d.id}">Approve</button>
+                <button class="btn btn-sm btn-danger" data-reject-kyc="${d.id}">Reject</button>
+              </div>` : ''}
+          </div>
+        `).join('');
+      } catch {
+        docsEl.innerHTML = 'Failed to load KYC documents.';
+      }
+    }
+    document.getElementById('kyc-docs').addEventListener('click', async (e) => {
+      const approveId = e.target.dataset.approveKyc;
+      const rejectId = e.target.dataset.rejectKyc;
+      if (approveId) { await apiCall('admin', 'approveKYC', { method: 'POST', body: JSON.stringify({ id: approveId }) }); loadKycDocs(); }
+      if (rejectId) {
+        const reason = prompt('Reason for rejection (shown to the user):') || '';
+        await apiCall('admin', 'rejectKYC', { method: 'POST', body: JSON.stringify({ id: rejectId, reason }) });
+        loadKycDocs();
+      }
+    });
+
+    // ============================================================
+    // Logs
+    // ============================================================
+    async function loadLogs() {
+      const type = document.getElementById('log-type').value;
+      const action = type === 'activity' ? 'activityLogs' : 'auditLogs';
+      const data = await apiCall('admin', action);
+      document.getElementById('log-entries').innerHTML = data.map(l => `
+        <div class="card mb-1">
+          <small>${new Date(l.created_at).toLocaleString()}</small> – <strong>${escapeHtml(l.action)}</strong>
+          ${l.details ? '<pre style="font-size:0.8rem">' + escapeHtml(JSON.stringify(l.details, null, 2)) + '</pre>' : ''}
+        </div>
+      `).join('');
+    }
+    document.getElementById('log-load-btn').addEventListener('click', loadLogs);
+
+    // ============================================================
+    // Boot
+    // ============================================================
+    (async () => {
+      const user = await checkAdmin();
+      if (!user) return;
+      showView(location.hash.slice(1) || 'dashboard');
     })();
   </script>
 </body>
