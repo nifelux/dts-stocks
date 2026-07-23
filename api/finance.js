@@ -1,6 +1,6 @@
 import supabaseAdmin from '../lib/supabase.js';
 import { sendTelegramMessage } from '../lib/telegram.js';
-import { verifyUser } from '../lib/auth.js';
+import { verifyUser, verifyAdmin } from '../lib/auth.js';
 
 export default async function handler(req, res) {
   // Support actions sent via URL query (?action=...) or request body ({ action: '...' })
@@ -27,6 +27,8 @@ export default async function handler(req, res) {
         return await listWithdrawalProofs(req, res);
       case 'addProofComment':
         return await addProofComment(req, res);
+      case 'purgeOldWithdrawalProofs':
+        return await purgeOldWithdrawalProofs(req, res);
       default:
         return res.status(400).json({ error: `Invalid or missing action parameter: '${action}'` });
     }
@@ -131,9 +133,6 @@ async function createDeposit(req, res) {
 
   if (!amount || Number(amount) <= 0) {
     return res.status(400).json({ error: 'Please enter a valid deposit amount' });
-  }
-  if (Number(amount) < 9500) {
-    return res.status(400).json({ error: 'Minimum deposit is ₦9,500' });
   }
 
   // 1. Create Deposit Record
@@ -315,9 +314,16 @@ async function createWithdrawalProof(req, res) {
 }
 
 async function listWithdrawalProofs(req, res) {
+  // Only today's proofs — the community feed is meant to show what's
+  // happening right now, not accumulate indefinitely. Matches the
+  // storage cleanup below, which deletes anything from before today.
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
   const { data: proofs, error } = await supabaseAdmin
     .from('withdrawal_proofs')
     .select('*, profiles(full_name, email)')
+    .gte('created_at', startOfToday.toISOString())
     .order('created_at', { ascending: false })
     .limit(30);
 
@@ -367,6 +373,59 @@ async function addProofComment(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(201).json(data);
-        }
+}
 
-    
+/**
+ * Deletes withdrawal proof screenshots (and their DB rows) from before
+ * today. Supabase Storage has no native TTL/auto-expire feature, so
+ * this is what actually implements "delete at 00:00" — a scheduled job
+ * (see the `crons` entry in vercel.json) rather than a bucket setting.
+ *
+ * Deliberately driven by the withdrawal_proofs TABLE's image_url
+ * column, not by scanning the 'proofs' bucket or matching filename
+ * patterns — that bucket is also used by api/storage.js's generic
+ * uploader for something else, and pattern-matching filenames would
+ * risk deleting the wrong thing if that ever changes. This only ever
+ * touches paths we have an authoritative DB record for.
+ */
+async function purgeOldWithdrawalProofs(req, res) {
+  const authHeader = req.headers.authorization || '';
+  const providedSecret = authHeader.replace('Bearer ', '');
+  const isCron = process.env.CRON_SECRET && providedSecret === process.env.CRON_SECRET;
+  if (!isCron) {
+    try {
+      await verifyAdmin(req);
+    } catch (err) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const { data: oldProofs, error: fetchErr } = await supabaseAdmin
+    .from('withdrawal_proofs')
+    .select('id, image_url')
+    .lt('created_at', startOfToday.toISOString());
+
+  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+  if (!oldProofs || oldProofs.length === 0) {
+    return res.status(200).json({ message: 'Nothing to purge', deletedCount: 0 });
+  }
+
+  const paths = oldProofs.map(p => p.image_url).filter(Boolean);
+  if (paths.length > 0) {
+    const { error: removeErr } = await supabaseAdmin.storage.from('proofs').remove(paths);
+    // Don't abort on a storage error — still clean up the DB rows so the
+    // feed doesn't keep showing entries whose images may already be gone
+    // or inaccessible; log it so a stuck file is at least visible.
+    if (removeErr) console.error('Storage removal error during proof purge:', removeErr.message);
+  }
+
+  const idsToDelete = oldProofs.map(p => p.id);
+  const { error: deleteErr } = await supabaseAdmin.from('withdrawal_proofs').delete().in('id', idsToDelete);
+  if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+
+  return res.status(200).json({ message: 'Purged old withdrawal proofs', deletedCount: idsToDelete.length });
+}
+  
