@@ -388,6 +388,44 @@ async function addProofComment(req, res) {
  * risk deleting the wrong thing if that ever changes. This only ever
  * touches paths we have an authoritative DB record for.
  */
+/**
+ * Core logic, extracted so the Telegram bot (/purgeproofs) can call this
+ * directly in-process instead of making an HTTP round-trip back to this
+ * same deployment — that self-call was the cause of "works but no
+ * success message": the extra network hop (DNS + TLS + possible cold
+ * start) could push past the 10s function timeout, killing the
+ * notification.js function before it ever got a response to relay back
+ * to Telegram, even though the purge itself had already completed.
+ */
+export async function purgeOldWithdrawalProofsCore() {
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const { data: oldProofs, error: fetchErr } = await supabaseAdmin
+    .from('withdrawal_proofs')
+    .select('id, image_url')
+    .lt('created_at', startOfToday.toISOString());
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!oldProofs || oldProofs.length === 0) {
+    return { ok: true, message: 'Nothing to purge', deletedCount: 0 };
+  }
+
+  const paths = oldProofs.map(p => p.image_url).filter(Boolean);
+  if (paths.length > 0) {
+    const { error: removeErr } = await supabaseAdmin.storage.from('proofs').remove(paths);
+    if (removeErr) console.error('Storage removal error during proof purge:', removeErr.message);
+  }
+
+  const idsToDelete = oldProofs.map(p => p.id);
+  const { error: deleteErr } = await supabaseAdmin.from('withdrawal_proofs').delete().in('id', idsToDelete);
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  return { ok: true, message: 'Purged old withdrawal proofs', deletedCount: idsToDelete.length };
+}
+
+/* Thin HTTP wrapper — still used if you ever trigger this via a direct
+   API call (e.g. a future cron, or manually with curl + CRON_SECRET). */
 async function purgeOldWithdrawalProofs(req, res) {
   const authHeader = req.headers.authorization || '';
   const providedSecret = authHeader.replace('Bearer ', '');
@@ -400,32 +438,9 @@ async function purgeOldWithdrawalProofs(req, res) {
     }
   }
 
-  const startOfToday = new Date();
-  startOfToday.setUTCHours(0, 0, 0, 0);
-
-  const { data: oldProofs, error: fetchErr } = await supabaseAdmin
-    .from('withdrawal_proofs')
-    .select('id, image_url')
-    .lt('created_at', startOfToday.toISOString());
-
-  if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-  if (!oldProofs || oldProofs.length === 0) {
-    return res.status(200).json({ message: 'Nothing to purge', deletedCount: 0 });
-  }
-
-  const paths = oldProofs.map(p => p.image_url).filter(Boolean);
-  if (paths.length > 0) {
-    const { error: removeErr } = await supabaseAdmin.storage.from('proofs').remove(paths);
-    // Don't abort on a storage error — still clean up the DB rows so the
-    // feed doesn't keep showing entries whose images may already be gone
-    // or inaccessible; log it so a stuck file is at least visible.
-    if (removeErr) console.error('Storage removal error during proof purge:', removeErr.message);
-  }
-
-  const idsToDelete = oldProofs.map(p => p.id);
-  const { error: deleteErr } = await supabaseAdmin.from('withdrawal_proofs').delete().in('id', idsToDelete);
-  if (deleteErr) return res.status(500).json({ error: deleteErr.message });
-
-  return res.status(200).json({ message: 'Purged old withdrawal proofs', deletedCount: idsToDelete.length });
+  const result = await purgeOldWithdrawalProofsCore();
+  return res.status(result.ok ? 200 : 500).json(
+    result.ok ? { message: result.message, deletedCount: result.deletedCount } : { error: result.error }
+  );
 }
   
