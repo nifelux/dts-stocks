@@ -146,259 +146,140 @@ async function getAdminDeposits(req, res) {
 /**
  * Approve Pending Withdrawal
  */
-async function approveWithdrawal(req, res) {
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+/**
+ * Core logic for all four approve/reject actions, extracted so both
+ * this file's HTTP handlers AND the Telegram bot's inline-button
+ * callbacks (see api/notification.js) call the exact same code path —
+ * no duplicated business logic to let drift out of sync.
+ * Returns { ok, message } on success or { ok: false, error } on failure;
+ * never touches req/res directly so it works from either caller.
+ */
+export async function approveWithdrawalCore(withdrawal_id, admin_notes) {
+  if (!withdrawal_id) return { ok: false, error: 'Withdrawal ID is required' };
 
-  const { withdrawal_id, admin_notes } = req.body;
-  if (!withdrawal_id) return res.status(400).json({ error: 'Withdrawal ID is required' });
-
-  const { data: wd } = await supabaseAdmin
-    .from('withdrawals')
-    .select('*')
-    .eq('id', withdrawal_id)
-    .single();
-
+  const { data: wd } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
   if (!wd || wd.status !== 'pending') {
-    return res.status(400).json({ error: 'Withdrawal record not found or already processed' });
+    return { ok: false, error: 'Withdrawal record not found or already processed' };
   }
 
-  // 1. Mark Withdrawal Approved
   const { error: wdErr } = await supabaseAdmin
     .from('withdrawals')
-    .update({
-      status: 'approved',
-      admin_notes: admin_notes || null,
-      updated_at: new Date()
-    })
+    .update({ status: 'approved', admin_notes: admin_notes || null, updated_at: new Date() })
     .eq('id', withdrawal_id);
+  if (wdErr) return { ok: false, error: 'Failed to update withdrawal status' };
 
-  if (wdErr) {
-    return res.status(500).json({ error: 'Failed to update withdrawal status' });
-  }
-
-  // 2. Debit the wallet. Same defensive pattern as approveDeposit: if
-  // no matching transaction exists for some reason, insert one directly
-  // instead of silently updating zero rows.
-  const { data: existingTxn } = await supabaseAdmin
-    .from('transactions')
-    .select('id')
-    .eq('reference', `wd_${wd.id}`)
-    .maybeSingle();
-
+  const { data: existingTxn } = await supabaseAdmin.from('transactions').select('id').eq('reference', `wd_${wd.id}`).maybeSingle();
   if (existingTxn) {
-    await supabaseAdmin
-      .from('transactions')
-      .update({ status: 'approved' })
-      .eq('reference', `wd_${wd.id}`);
+    await supabaseAdmin.from('transactions').update({ status: 'approved' }).eq('reference', `wd_${wd.id}`);
   } else {
     console.warn(`No transaction found for withdrawal ${wd.id} — creating one directly.`);
     const { error: txnInsertErr } = await supabaseAdmin.from('transactions').insert({
-      user_id: wd.user_id,
-      type: 'withdrawal',
-      amount: wd.amount,
-      status: 'approved',
-      reference: `wd_${wd.id}`
+      user_id: wd.user_id, type: 'withdrawal', amount: wd.amount, status: 'approved', reference: `wd_${wd.id}`
     });
-    if (txnInsertErr) {
-      return res.status(500).json({ error: `Withdrawal marked approved but wallet debit failed: ${txnInsertErr.message}` });
-    }
+    if (txnInsertErr) return { ok: false, error: `Withdrawal marked approved but wallet debit failed: ${txnInsertErr.message}` };
   }
 
-  // 3. Send Notification
-  await sendTelegramMessage(
-    `✅ *Withdrawal Approved*\n` +
-    `ID: \`${wd.id}\`\n` +
-    `Amount: ₦${wd.amount}\n` +
-    `User ID: \`${wd.user_id}\``
-  );
-
-  return res.status(200).json({ message: 'Withdrawal approved successfully' });
+  await sendTelegramMessage(`✅ *Withdrawal Approved*\nID: \`${wd.id}\`\nAmount: ₦${wd.amount}\nUser ID: \`${wd.user_id}\``);
+  return { ok: true, message: 'Withdrawal approved successfully', record: wd };
 }
 
-/**
- * Reject Withdrawal & Refund User Balance
- */
-async function rejectWithdrawal(req, res) {
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+export async function rejectWithdrawalCore(withdrawal_id, admin_notes) {
+  if (!withdrawal_id) return { ok: false, error: 'Withdrawal ID is required' };
 
-  const { withdrawal_id, admin_notes } = req.body;
-  if (!withdrawal_id) return res.status(400).json({ error: 'Withdrawal ID is required' });
-
-  const { data: wd } = await supabaseAdmin
-    .from('withdrawals')
-    .select('*')
-    .eq('id', withdrawal_id)
-    .single();
-
+  const { data: wd } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
   if (!wd || wd.status !== 'pending') {
-    return res.status(400).json({ error: 'Withdrawal record not found or already processed' });
+    return { ok: false, error: 'Withdrawal record not found or already processed' };
   }
 
-  // 1. Mark Withdrawal Rejected
   const { error: wdErr } = await supabaseAdmin
     .from('withdrawals')
-    .update({
-      status: 'rejected',
-      admin_notes: admin_notes || null,
-      updated_at: new Date()
-    })
+    .update({ status: 'rejected', admin_notes: admin_notes || null, updated_at: new Date() })
     .eq('id', withdrawal_id);
+  if (wdErr) return { ok: false, error: 'Failed to update withdrawal status' };
 
-  if (wdErr) {
-    return res.status(500).json({ error: 'Failed to update withdrawal status' });
-  }
+  await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('reference', `wd_${wd.id}`);
 
-  // 2. Mark Transaction Rejected
-  await supabaseAdmin
-    .from('transactions')
-    .update({ status: 'rejected' })
-    .eq('reference', `wd_${wd.id}`);
+  // No refund needed — the wallet was never debited at request time.
+  // trg_process_transaction only debits balance once the linked
+  // transaction is marked 'approved', which never happens here.
 
-  // 3. No refund needed — the wallet was never debited at request time.
-  // The trg_process_transaction trigger only debits balance once the
-  // linked transaction is marked 'approved', which never happens for a
-  // rejected request (its transaction is marked 'rejected' below), so
-  // the funds were never actually removed from the wallet.
-
-  // 4. Send Notification
-  await sendTelegramMessage(
-    `❌ *Withdrawal Rejected & Refunded*\n` +
-    `ID: \`${wd.id}\`\n` +
-    `Amount: ₦${wd.amount}\n` +
-    `Reason: ${admin_notes || 'N/A'}`
-  );
-
-  return res.status(200).json({ message: 'Withdrawal rejected and funds refunded' });
+  await sendTelegramMessage(`❌ *Withdrawal Rejected & Refunded*\nID: \`${wd.id}\`\nAmount: ₦${wd.amount}\nReason: ${admin_notes || 'N/A'}`);
+  return { ok: true, message: 'Withdrawal rejected and funds refunded', record: wd };
 }
 
-/**
- * Approve Pending Deposit and Credit User Balance
- */
-async function approveDeposit(req, res) {
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+export async function approveDepositCore(deposit_id, admin_notes) {
+  if (!deposit_id) return { ok: false, error: 'Deposit ID is required' };
 
-  const { deposit_id, admin_notes } = req.body;
-  if (!deposit_id) return res.status(400).json({ error: 'Deposit ID is required' });
-
-  const { data: deposit } = await supabaseAdmin
-    .from('deposits')
-    .select('*')
-    .eq('id', deposit_id)
-    .single();
-
+  const { data: deposit } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
   if (!deposit || deposit.status !== 'pending') {
-    return res.status(400).json({ error: 'Deposit record not found or already processed' });
+    return { ok: false, error: 'Deposit record not found or already processed' };
   }
 
-  // 1. Mark Deposit Approved
   const { error: depErr } = await supabaseAdmin
     .from('deposits')
-    .update({
-      status: 'approved',
-      admin_notes: admin_notes || null,
-      updated_at: new Date()
-    })
+    .update({ status: 'approved', admin_notes: admin_notes || null, updated_at: new Date() })
     .eq('id', deposit_id);
+  if (depErr) return { ok: false, error: 'Failed to update deposit status' };
 
-  if (depErr) {
-    return res.status(500).json({ error: 'Failed to update deposit status' });
-  }
-
-  // 2. Credit the wallet. If a matching pending transaction already
-  // exists (the normal case), updating it to 'approved' is what fires
-  // trg_process_transaction. If none exists — e.g. this deposit was
-  // created by an older code path that never logged one — the UPDATE
-  // below would silently affect zero rows and nothing would be
-  // credited, with no error anywhere. Insert one directly in that case
-  // instead, which fires the trigger via INSERT.
-  const { data: existingTxn } = await supabaseAdmin
-    .from('transactions')
-    .select('id')
-    .eq('reference', `dp_${deposit.id}`)
-    .maybeSingle();
-
+  const { data: existingTxn } = await supabaseAdmin.from('transactions').select('id').eq('reference', `dp_${deposit.id}`).maybeSingle();
   if (existingTxn) {
-    await supabaseAdmin
-      .from('transactions')
-      .update({ status: 'approved' })
-      .eq('reference', `dp_${deposit.id}`);
+    await supabaseAdmin.from('transactions').update({ status: 'approved' }).eq('reference', `dp_${deposit.id}`);
   } else {
     console.warn(`No transaction found for deposit ${deposit.id} — creating one directly.`);
     const { error: txnInsertErr } = await supabaseAdmin.from('transactions').insert({
-      user_id: deposit.user_id,
-      type: 'deposit',
-      amount: deposit.amount,
-      status: 'approved',
-      reference: `dp_${deposit.id}`
+      user_id: deposit.user_id, type: 'deposit', amount: deposit.amount, status: 'approved', reference: `dp_${deposit.id}`
     });
-    if (txnInsertErr) {
-      return res.status(500).json({ error: `Deposit marked approved but wallet credit failed: ${txnInsertErr.message}` });
-    }
+    if (txnInsertErr) return { ok: false, error: `Deposit marked approved but wallet credit failed: ${txnInsertErr.message}` };
   }
 
-  // 4. Send Notification
-  await sendTelegramMessage(
-    `✅ *Deposit Approved & Credited*\n` +
-    `ID: \`${deposit.id}\`\n` +
-    `Amount: ₦${deposit.amount}\n` +
-    `User ID: \`${deposit.user_id}\``
-  );
-
-  return res.status(200).json({ message: 'Deposit approved and wallet credited successfully' });
+  await sendTelegramMessage(`✅ *Deposit Approved & Credited*\nID: \`${deposit.id}\`\nAmount: ₦${deposit.amount}\nUser ID: \`${deposit.user_id}\``);
+  return { ok: true, message: 'Deposit approved and wallet credited successfully', record: deposit };
 }
 
-/**
- * Reject Deposit Request
- */
-async function rejectDeposit(req, res) {
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+export async function rejectDepositCore(deposit_id, admin_notes) {
+  if (!deposit_id) return { ok: false, error: 'Deposit ID is required' };
 
-  const { deposit_id, admin_notes } = req.body;
-  if (!deposit_id) return res.status(400).json({ error: 'Deposit ID is required' });
-
-  const { data: deposit } = await supabaseAdmin
-    .from('deposits')
-    .select('*')
-    .eq('id', deposit_id)
-    .single();
-
+  const { data: deposit } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
   if (!deposit || deposit.status !== 'pending') {
-    return res.status(400).json({ error: 'Deposit record not found or already processed' });
+    return { ok: false, error: 'Deposit record not found or already processed' };
   }
 
-  // 1. Mark Deposit Rejected
   const { error: depErr } = await supabaseAdmin
     .from('deposits')
-    .update({
-      status: 'rejected',
-      admin_notes: admin_notes || null,
-      updated_at: new Date()
-    })
+    .update({ status: 'rejected', admin_notes: admin_notes || null, updated_at: new Date() })
     .eq('id', deposit_id);
+  if (depErr) return { ok: false, error: 'Failed to update deposit status' };
 
-  if (depErr) {
-    return res.status(500).json({ error: 'Failed to update deposit status' });
-  }
+  await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('reference', `dp_${deposit.id}`);
 
-  // 2. Mark Transaction Rejected
-  await supabaseAdmin
-    .from('transactions')
-    .update({ status: 'rejected' })
-    .eq('reference', `dp_${deposit.id}`);
+  await sendTelegramMessage(`❌ *Deposit Rejected*\nID: \`${deposit.id}\`\nAmount: ₦${deposit.amount}\nReason: ${admin_notes || 'N/A'}`);
+  return { ok: true, message: 'Deposit rejected successfully', record: deposit };
+}
 
-  // 3. Send Notification
-  await sendTelegramMessage(
-    `❌ *Deposit Rejected*\n` +
-    `ID: \`${deposit.id}\`\n` +
-    `Amount: ₦${deposit.amount}\n` +
-    `Reason: ${admin_notes || 'N/A'}`
-  );
+/* ---- Thin HTTP wrappers used by the admin panel (unchanged behavior) ---- */
 
-  return res.status(200).json({ message: 'Deposit rejected successfully' });
+async function approveWithdrawal(req, res) {
+  await verifyAdmin(req);
+  const result = await approveWithdrawalCore(req.body.withdrawal_id, req.body.admin_notes);
+  return res.status(result.ok ? 200 : 400).json(result.ok ? { message: result.message } : { error: result.error });
+}
+
+async function rejectWithdrawal(req, res) {
+  await verifyAdmin(req);
+  const result = await rejectWithdrawalCore(req.body.withdrawal_id, req.body.admin_notes);
+  return res.status(result.ok ? 200 : 400).json(result.ok ? { message: result.message } : { error: result.error });
+}
+
+async function approveDeposit(req, res) {
+  await verifyAdmin(req);
+  const result = await approveDepositCore(req.body.deposit_id, req.body.admin_notes);
+  return res.status(result.ok ? 200 : 400).json(result.ok ? { message: result.message } : { error: result.error });
+}
+
+async function rejectDeposit(req, res) {
+  await verifyAdmin(req);
+  const result = await rejectDepositCore(req.body.deposit_id, req.body.admin_notes);
+  return res.status(result.ok ? 200 : 400).json(result.ok ? { message: result.message } : { error: result.error });
 }
 
 /**
