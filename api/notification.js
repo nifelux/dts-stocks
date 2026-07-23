@@ -92,6 +92,7 @@ async function telegramWebhook(req, res) {
         case '/deposits': return await handleDeposits(chatId, res);
         case '/withdrawals': return await handleWithdrawals(chatId, res);
         case '/broadcast': return await handleBroadcast(chatId, text, res);
+        case '/purgeproofs': return await handlePurgeProofs(chatId, res);
         case '/help': return await handleHelp(chatId, res);
         default:
           await sendToTelegram(chatId, 'Unknown command. Use /help');
@@ -284,6 +285,28 @@ async function handleBroadcast(chatId, text, res) {
   res.status(200).end();
 }
 
+async function handlePurgeProofs(chatId, res) {
+  try {
+    // Same endpoint Vercel's cron would have hit — using CRON_SECRET as
+    // the auth, not a JWT, since this call originates from inside
+    // another serverless function, not a logged-in browser session.
+    const baseUrl = process.env.APP_URL || `https://${process.env.VERCEL_URL}`;
+    const purgeRes = await fetch(`${baseUrl}/api/finance?action=purgeOldWithdrawalProofs`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` }
+    });
+    const data = await purgeRes.json();
+    if (!purgeRes.ok) {
+      await sendToTelegram(chatId, `⚠️ Purge failed: ${data.error || 'Unknown error'}`);
+    } else {
+      await sendToTelegram(chatId, `🗑️ ${data.message} (${data.deletedCount} removed)`);
+    }
+  } catch (err) {
+    await sendToTelegram(chatId, `⚠️ Purge failed: ${err.message}`);
+  }
+  res.status(200).end();
+}
+
 async function handleHelp(chatId, res) {
   const msg = `<b>Admin Commands:</b>
 /stats - Platform statistics
@@ -292,7 +315,8 @@ async function handleHelp(chatId, res) {
 /deposits - Pending deposits (with Approve/Reject buttons)
 /withdrawals - Pending withdrawals (with Approve/Reject buttons)
 /broadcast &lt;msg&gt; - Send message to all users
+/purgeproofs - Manually delete yesterday's-and-older withdrawal proof screenshots
 /help - Show this help`;
   await sendToTelegram(chatId, msg);
   res.status(200).end();
-    }
+}
