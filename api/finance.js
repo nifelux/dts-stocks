@@ -1,6 +1,21 @@
 import supabaseAdmin from '../lib/supabase.js';
 import { sendTelegramMessage } from '../lib/telegram.js';
-import { verifyUser, verifyAdmin } from '../lib/auth.js';
+import { verifyUser } from '../lib/auth.js';
+
+/**
+ * Withdrawal requests are only accepted Monday–Saturday, 10am–5pm West
+ * Africa Time (UTC+1, no DST — Nigeria doesn't observe it). Computed
+ * from server UTC time rather than trusting anything from the client,
+ * since a browser's clock/timezone is trivially spoofable.
+ */
+function isWithdrawalWindowOpen() {
+  const now = new Date();
+  const watHour = (now.getUTCHours() + 1) % 24;
+  const watDay = new Date(now.getTime() + 60 * 60 * 1000).getUTCDay(); // 0=Sun..6=Sat
+  const isMonToSat = watDay >= 1 && watDay <= 6;
+  const isWithinHours = watHour >= 10 && watHour < 17;
+  return isMonToSat && isWithinHours;
+}
 
 export default async function handler(req, res) {
   // Support actions sent via URL query (?action=...) or request body ({ action: '...' })
@@ -27,8 +42,6 @@ export default async function handler(req, res) {
         return await listWithdrawalProofs(req, res);
       case 'addProofComment':
         return await addProofComment(req, res);
-      case 'purgeOldWithdrawalProofs':
-        return await purgeOldWithdrawalProofs(req, res);
       default:
         return res.status(400).json({ error: `Invalid or missing action parameter: '${action}'` });
     }
@@ -189,7 +202,12 @@ async function createWithdrawal(req, res) {
 
   const { amount, bank_code, bank_name, account_number, account_name } = req.body;
 
-  // 1. Input Validations
+  // 1. Withdrawal hours: Monday-Saturday, 10am-5pm WAT
+  if (!isWithdrawalWindowOpen()) {
+    return res.status(400).json({ error: 'Withdrawals are only available Monday–Saturday, 10am–5pm.' });
+  }
+
+  // 2. Input Validations
   if (!amount || Number(amount) <= 0) {
     return res.status(400).json({ error: 'Please enter a valid withdrawal amount' });
   }
@@ -314,16 +332,9 @@ async function createWithdrawalProof(req, res) {
 }
 
 async function listWithdrawalProofs(req, res) {
-  // Only today's proofs — the community feed is meant to show what's
-  // happening right now, not accumulate indefinitely. Matches the
-  // storage cleanup below, which deletes anything from before today.
-  const startOfToday = new Date();
-  startOfToday.setUTCHours(0, 0, 0, 0);
-
   const { data: proofs, error } = await supabaseAdmin
     .from('withdrawal_proofs')
     .select('*, profiles(full_name, email)')
-    .gte('created_at', startOfToday.toISOString())
     .order('created_at', { ascending: false })
     .limit(30);
 
@@ -373,74 +384,5 @@ async function addProofComment(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(201).json(data);
-}
-
-/**
- * Deletes withdrawal proof screenshots (and their DB rows) from before
- * today. Supabase Storage has no native TTL/auto-expire feature, so
- * this is what actually implements "delete at 00:00" — a scheduled job
- * (see the `crons` entry in vercel.json) rather than a bucket setting.
- *
- * Deliberately driven by the withdrawal_proofs TABLE's image_url
- * column, not by scanning the 'proofs' bucket or matching filename
- * patterns — that bucket is also used by api/storage.js's generic
- * uploader for something else, and pattern-matching filenames would
- * risk deleting the wrong thing if that ever changes. This only ever
- * touches paths we have an authoritative DB record for.
- */
-/**
- * Core logic, extracted so the Telegram bot (/purgeproofs) can call this
- * directly in-process instead of making an HTTP round-trip back to this
- * same deployment — that self-call was the cause of "works but no
- * success message": the extra network hop (DNS + TLS + possible cold
- * start) could push past the 10s function timeout, killing the
- * notification.js function before it ever got a response to relay back
- * to Telegram, even though the purge itself had already completed.
- */
-export async function purgeOldWithdrawalProofsCore() {
-  const startOfToday = new Date();
-  startOfToday.setUTCHours(0, 0, 0, 0);
-
-  const { data: oldProofs, error: fetchErr } = await supabaseAdmin
-    .from('withdrawal_proofs')
-    .select('id, image_url')
-    .lt('created_at', startOfToday.toISOString());
-
-  if (fetchErr) return { ok: false, error: fetchErr.message };
-  if (!oldProofs || oldProofs.length === 0) {
-    return { ok: true, message: 'Nothing to purge', deletedCount: 0 };
-  }
-
-  const paths = oldProofs.map(p => p.image_url).filter(Boolean);
-  if (paths.length > 0) {
-    const { error: removeErr } = await supabaseAdmin.storage.from('proofs').remove(paths);
-    if (removeErr) console.error('Storage removal error during proof purge:', removeErr.message);
-  }
-
-  const idsToDelete = oldProofs.map(p => p.id);
-  const { error: deleteErr } = await supabaseAdmin.from('withdrawal_proofs').delete().in('id', idsToDelete);
-  if (deleteErr) return { ok: false, error: deleteErr.message };
-
-  return { ok: true, message: 'Purged old withdrawal proofs', deletedCount: idsToDelete.length };
-}
-
-/* Thin HTTP wrapper — still used if you ever trigger this via a direct
-   API call (e.g. a future cron, or manually with curl + CRON_SECRET). */
-async function purgeOldWithdrawalProofs(req, res) {
-  const authHeader = req.headers.authorization || '';
-  const providedSecret = authHeader.replace('Bearer ', '');
-  const isCron = process.env.CRON_SECRET && providedSecret === process.env.CRON_SECRET;
-  if (!isCron) {
-    try {
-      await verifyAdmin(req);
-    } catch (err) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-  }
-
-  const result = await purgeOldWithdrawalProofsCore();
-  return res.status(result.ok ? 200 : 500).json(
-    result.ok ? { message: result.message, deletedCount: result.deletedCount } : { error: result.error }
-  );
-}
-  
+        }
+    
