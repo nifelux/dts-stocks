@@ -28,8 +28,6 @@ export default async function handler(req, res) {
         return await approveKYC(req, res);
       case 'rejectKYC':
         return await rejectKYC(req, res);
-      case 'getUserTeam':
-        return await getUserTeam(req, res);
       // Gift codes
       case 'giftCodesList':
         return await giftCodesList(req, res);
@@ -209,6 +207,67 @@ export async function rejectWithdrawalCore(withdrawal_id, admin_notes) {
   return { ok: true, message: 'Withdrawal rejected and funds refunded', record: wd };
 }
 
+const REFERRAL_FIRST_DEPOSIT_BONUS_PERCENT = 10;
+
+/**
+ * Credits the referrer 10% of a depositor's FIRST-EVER approved deposit
+ * only. Silently does nothing if the depositor wasn't referred, or if
+ * this isn't their first approved deposit.
+ *
+ * Credits via a direct transaction INSERT with status already
+ * 'approved' (type: 'referral') — process_transaction() already
+ * recognizes 'referral' as a credit type, and firing on INSERT (not an
+ * update from pending) means it fires exactly once. The reference is
+ * scoped to this specific deposit, so even if this function were ever
+ * called twice for the same deposit, the second insert would fail on
+ * the unique constraint rather than double-crediting.
+ */
+async function maybeCreditReferralBonus(deposit) {
+  const { data: depositorProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('referred_by')
+    .eq('id', deposit.user_id)
+    .single();
+
+  const referrerId = depositorProfile?.referred_by;
+  if (!referrerId || referrerId === deposit.user_id) return; // not referred (or a data anomaly)
+
+  const { count: priorApprovedDeposits } = await supabaseAdmin
+    .from('deposits')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', deposit.user_id)
+    .eq('status', 'approved')
+    .neq('id', deposit.id);
+
+  if ((priorApprovedDeposits || 0) > 0) return; // not their first deposit
+
+  const rewardAmount = Number(deposit.amount) * (REFERRAL_FIRST_DEPOSIT_BONUS_PERCENT / 100);
+
+  const { error: txnErr } = await supabaseAdmin.from('transactions').insert({
+    user_id: referrerId,
+    type: 'referral',
+    amount: rewardAmount,
+    status: 'approved',
+    reference: `refbonus_dep_${deposit.id}`
+  });
+  if (txnErr) {
+    if (!txnErr.message.includes('duplicate')) console.error('Referral bonus credit failed:', txnErr.message);
+    return;
+  }
+
+  await supabaseAdmin.from('referral_rewards').insert({
+    referrer_id: referrerId,
+    referred_user_id: deposit.user_id,
+    level: 1,
+    reward_percent: REFERRAL_FIRST_DEPOSIT_BONUS_PERCENT,
+    reward_amount: rewardAmount,
+    transaction_type: 'deposit',
+    reference_id: deposit.id
+  });
+
+  await sendTelegramMessage(`🎉 *Referral Bonus Paid*\nReferrer: \`${referrerId}\`\nAmount: ₦${rewardAmount}\n(10% of referred user's first deposit, ₦${deposit.amount})`);
+}
+
 export async function approveDepositCore(deposit_id, admin_notes) {
   if (!deposit_id) return { ok: false, error: 'Deposit ID is required' };
 
@@ -233,6 +292,8 @@ export async function approveDepositCore(deposit_id, admin_notes) {
     });
     if (txnInsertErr) return { ok: false, error: `Deposit marked approved but wallet credit failed: ${txnInsertErr.message}` };
   }
+
+  await maybeCreditReferralBonus(deposit);
 
   await sendTelegramMessage(`✅ *Deposit Approved & Credited*\nID: \`${deposit.id}\`\nAmount: ₦${deposit.amount}\nUser ID: \`${deposit.user_id}\``);
   return { ok: true, message: 'Deposit approved and wallet credited successfully', record: deposit };
@@ -723,32 +784,4 @@ async function createVipLevel(req, res) {
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
   return res.status(200).json(data);
-}
-
-/* ============================================================
-   USER TEAM (referrals + their deposits) — for the Team button
-   in the Users section of the admin dashboard.
-   ============================================================ */
-async function getUserTeam(req, res) {
-  const admin = await verifyAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
-
-  const { user_id } = req.query;
-  if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
-
-  const { data: team, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id, full_name, email, created_at, vip_level, wallets(balance, total_deposited)')
-    .eq('referred_by', user_id)
-    .order('created_at', { ascending: false });
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  const totalTeamDeposits = (team || []).reduce((sum, m) => sum + Number(m.wallets?.total_deposited || 0), 0);
-
-  return res.status(200).json({
-    team: team || [],
-    total_team_deposits: totalTeamDeposits,
-    team_size: (team || []).length
-  });
 }
