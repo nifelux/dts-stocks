@@ -28,6 +28,8 @@ export default async function handler(req, res) {
         return await approveKYC(req, res);
       case 'rejectKYC':
         return await rejectKYC(req, res);
+      case 'getUserTeam':
+        return await getUserTeam(req, res);
       // Gift codes
       case 'giftCodesList':
         return await giftCodesList(req, res);
@@ -721,4 +723,32 @@ async function createVipLevel(req, res) {
   }).select().single();
   if (error) return res.status(400).json({ error: error.message });
   return res.status(200).json(data);
+}
+
+/* ============================================================
+   USER TEAM (referrals + their deposits) — for the Team button
+   in the Users section of the admin dashboard.
+   ============================================================ */
+async function getUserTeam(req, res) {
+  const admin = await verifyAdmin(req);
+  if (!admin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
+
+  const { data: team, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id, full_name, email, created_at, vip_level, wallets(balance, total_deposited)')
+    .eq('referred_by', user_id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const totalTeamDeposits = (team || []).reduce((sum, m) => sum + Number(m.wallets?.total_deposited || 0), 0);
+
+  return res.status(200).json({
+    team: team || [],
+    total_team_deposits: totalTeamDeposits,
+    team_size: (team || []).length
+  });
 }
